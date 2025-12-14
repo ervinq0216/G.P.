@@ -125,19 +125,68 @@
         </scroll-view>
       </view>
 
-      <!-- Module C: AI 咨询 (WebView) -->
-      <view class="module-ai" v-if="currentTab === 2">
-        <!-- WebView 容器 -->
-        <!-- 注意：web-view 在小程序中会自动铺满全屏，但在H5中可以控制 -->
-        <web-view 
-          v-if="aiConfirmed" 
-          src="https://chat.deepseek.com"
-          :update-title="false"
-        ></web-view>
+      <!-- Module C: AI 咨询 (原生聊天界面) -->
+      <view class="module-ai-chat" v-if="currentTab === 2">
         
-        <!-- 如果未确认，显示占位背景 -->
-        <view v-else class="ai-placeholder">
-          <text>正在初始化智能助手...</text>
+        <!-- 聊天记录区域 -->
+        <scroll-view 
+          scroll-y 
+          class="chat-history" 
+          :scroll-top="scrollTop"
+          :scroll-with-animation="true"
+        >
+          <!-- 默认欢迎语 -->
+          <view class="chat-item ai">
+            <view class="avatar ai-avatar">AI</view>
+            <view class="bubble ai-bubble">
+              <text>您好！我是您的智能健康助手。请描述您的症状，我会为您推荐科室或提供初步建议。</text>
+            </view>
+          </view>
+
+          <!-- 动态消息列表 -->
+          <view 
+            v-for="(msg, index) in chatList" 
+            :key="index" 
+            class="chat-item"
+            :class="msg.role"
+          >
+            <!-- 头像 -->
+            <view class="avatar" :class="msg.role + '-avatar'">
+              {{ msg.role === 'user' ? '我' : 'AI' }}
+            </view>
+            
+            <!-- 气泡 -->
+            <view class="bubble" :class="msg.role + '-bubble'">
+              <text selectable>{{ msg.content }}</text>
+            </view>
+          </view>
+
+          <!-- 加载中状态 -->
+          <view class="chat-item ai" v-if="isAiLoading">
+            <view class="avatar ai-avatar">AI</view>
+            <view class="bubble ai-bubble loading-bubble">
+              <view class="dot-loading">...</view>
+            </view>
+          </view>
+          
+          <!-- 底部垫高，防止被输入框遮挡 -->
+          <view style="height: 120rpx;"></view>
+        </scroll-view>
+
+        <!-- 底部输入框 -->
+        <view class="chat-input-area">
+          <input 
+            class="chat-input" 
+            v-model="inputMessage" 
+            placeholder="请输入您的症状..." 
+            confirm-type="send"
+            @confirm="sendMessage"
+          />
+          <button 
+            class="send-btn" 
+            :disabled="isAiLoading || !inputMessage.trim()"
+            @click="sendMessage"
+          >发送</button>
         </view>
       </view>
 
@@ -171,6 +220,12 @@ export default {
       // AI 模块状态
       showAIModal: false,
       aiConfirmed: false,
+      
+      // 聊天相关数据
+      inputMessage: '',
+      chatList: [], // { role: 'user'/'ai', content: '...' }
+      isAiLoading: false,
+      scrollTop: 0, // 控制滚动条位置
 
       // 模拟公告数据
       announcements: [
@@ -217,11 +272,12 @@ export default {
         if (!this.aiConfirmed) {
           // 没确认过，显示弹窗
           this.showAIModal = true;
-          // 暂时不切换 tab，等确认后再切换，或者先切换背景
+          // 暂时不切换 tab，等确认后再切换
           this.currentTab = index; 
         } else {
           // 已确认过，直接进
           this.currentTab = index;
+          this.scrollToBottom(); // 切换回来时滚动到底部
         }
       } else {
         // 其他 Tab 正常切换
@@ -233,8 +289,75 @@ export default {
     confirmAI() {
       this.showAIModal = false;
       this.aiConfirmed = true;
-      // 强制刷新 WebView 状态
+      // 强制刷新 WebView 状态 (这里不需要了，因为我们用的原生 View)
       this.$forceUpdate();
+    },
+
+    // --- 发送消息逻辑 ---
+    sendMessage() {
+      const msg = this.inputMessage.trim();
+      if (!msg) return;
+
+      // 1. 添加用户消息到列表
+      this.chatList.push({ role: 'user', content: msg });
+      this.inputMessage = ''; // 清空输入框
+      this.isAiLoading = true;
+      this.scrollToBottom();
+
+      // 2. 调用后端 API
+      uni.request({
+        url: 'http://localhost:8080/api/ai/chat', // 真机调试请改IP
+        method: 'POST',
+        data: { message: msg },
+        success: (res) => {
+          if (res.data.code === 200) {
+            // 解析后端返回的数据
+            // 注意：这里假设后端 AiController 返回的是 Result.success(response.body())
+            // 且 response.body() 是 DeepSeek 的完整 JSON 响应字符串
+            
+            console.log('AI Raw Response:', res.data.data);
+            
+            let aiContent = '';
+            try {
+              // 尝试解析 JSON
+              const deepSeekRes = JSON.parse(res.data.data);
+              // 提取 content
+              if (deepSeekRes.choices && deepSeekRes.choices.length > 0) {
+                aiContent = deepSeekRes.choices[0].message.content;
+              } else {
+                aiContent = 'AI 没有返回有效内容。';
+              }
+            } catch (e) {
+              // 如果解析失败，可能后端直接返回了 content 字符串，或者格式不对
+              console.warn('JSON Parse Error:', e);
+              aiContent = res.data.data || '数据解析错误，请稍后再试。';
+            }
+
+            this.chatList.push({ role: 'ai', content: aiContent });
+          } else {
+            this.chatList.push({ role: 'ai', content: '服务出错：' + res.data.msg });
+          }
+        },
+        fail: (err) => {
+          console.error(err);
+          this.chatList.push({ role: 'ai', content: '网络连接失败，请检查后端服务。' });
+        },
+        complete: () => {
+          this.isAiLoading = false;
+          this.scrollToBottom();
+        }
+      });
+    },
+
+    // 滚动到底部
+    scrollToBottom() {
+      setTimeout(() => {
+        this.scrollTop = 99999; // 设置一个足够大的值
+        // 强制触发 Vue 更新
+        this.$nextTick(() => {
+          this.scrollTop += 1;
+        });
+      }, 100);
     },
 
     // 模拟功能
@@ -278,6 +401,7 @@ export default {
   background-color: #fff;
   box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
   z-index: 10;
+  flex-shrink: 0; /* 防止被压缩 */
 }
 
 .tab-item {
@@ -314,6 +438,8 @@ export default {
   flex: 1;
   overflow: hidden; /* 防止内容溢出 */
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 /* --- Module A: 医院简介 --- */
@@ -427,6 +553,7 @@ export default {
   height: 100%;
   display: flex;
   background-color: #fff;
+  width: 100%;
 }
 
 /* 左侧边栏 */
@@ -511,19 +638,130 @@ export default {
   text-align: center;
 }
 
-/* --- Module C: AI 咨询 --- */
-.module-ai {
+/* --- Module C: AI 聊天界面样式 --- */
+.module-ai-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #f5f7fa;
   height: 100%;
-  width: 100%;
 }
 
-.ai-placeholder {
-  height: 100%;
+.chat-history {
+  flex: 1;
+  padding: 20rpx;
+  box-sizing: border-box;
+  height: 0; /* 关键：让 flex 子项正确计算高度 */
+}
+
+.chat-item {
+  display: flex;
+  margin-bottom: 30rpx;
+}
+
+.chat-item.user {
+  flex-direction: row-reverse;
+}
+
+.avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #999;
   font-size: 28rpx;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.ai-avatar {
+  background: linear-gradient(135deg, #2b86ff, #2bdfff);
+  margin-right: 20rpx;
+}
+
+.user-avatar {
+  background-color: #ff9800;
+  margin-left: 20rpx;
+}
+
+.bubble {
+  max-width: 70%;
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  line-height: 1.5;
+  position: relative;
+  word-break: break-all;
+}
+
+.ai-bubble {
+  background-color: #fff;
+  color: #333;
+  border-top-left-radius: 4rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.05);
+}
+
+.user-bubble {
+  background-color: #2b86ff;
+  color: #fff;
+  border-top-right-radius: 4rpx;
+  box-shadow: 0 2rpx 8rpx rgba(43, 134, 255, 0.3);
+}
+
+.loading-bubble {
+  padding: 10rpx 20rpx;
+}
+
+.dot-loading {
+  font-weight: bold;
+  letter-spacing: 4rpx;
+  color: #999;
+  animation: breathe 1.5s infinite;
+}
+
+@keyframes breathe {
+  0% { opacity: 0.3; }
+  50% { opacity: 1; }
+  100% { opacity: 0.3; }
+}
+
+/* 底部输入框 */
+.chat-input-area {
+  height: 100rpx;
+  background-color: #fff;
+  border-top: 1rpx solid #eee;
+  display: flex;
+  align-items: center;
+  padding: 0 20rpx;
+  position: relative;
+  z-index: 20;
+}
+
+.chat-input {
+  flex: 1;
+  height: 70rpx;
+  background-color: #f5f7fa;
+  border-radius: 35rpx;
+  padding: 0 30rpx;
+  font-size: 28rpx;
+  margin-right: 20rpx;
+}
+
+.send-btn {
+  width: 120rpx;
+  height: 70rpx;
+  line-height: 70rpx;
+  background-color: #2b86ff;
+  color: #fff;
+  font-size: 28rpx;
+  border-radius: 35rpx;
+  padding: 0;
+}
+
+.send-btn[disabled] {
+  background-color: #ccc;
+  color: #fff;
 }
 
 /* --- 弹窗样式 --- */
