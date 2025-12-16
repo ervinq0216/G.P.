@@ -26,6 +26,12 @@
 		        "navigationBarTitleText": "患者主页"
 		      }
 		},
+		{
+					"path": "pages/patient/info",
+					"style": {
+						"navigationBarTitleText": "完善个人信息"
+					}
+				},
 		    {
 		      "path": "pages/doctor/home",
 		      "style": {

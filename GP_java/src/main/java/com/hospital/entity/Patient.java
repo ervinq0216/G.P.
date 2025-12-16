@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -33,6 +34,36 @@ public class Patient {
      * 真实姓名
      */
     private String realName;
+
+    /**
+     * 头像 (Base64字符串或URL)
+     */
+    private String avatar;
+
+    /**
+     * 性别 (男/女)
+     */
+    private String gender;
+
+    /**
+     * 出生日期 (用于计算年龄)
+     */
+    private LocalDate birthday;
+
+    /**
+     * 身高 (cm)
+     */
+    private Double height;
+
+    /**
+     * 体重 (kg)
+     */
+    private Double weight;
+
+    /**
+     * 血型 (A/B/AB/O/Rh+)
+     */
+    private String bloodType;
 
     /**
      * 创建时间
