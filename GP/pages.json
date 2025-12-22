@@ -45,6 +45,13 @@
 		      }
 		},
 		{
+		      "path": "pages/doctor/info",
+		      "style": {
+		        "navigationBarTitleText": "编辑医生信息",
+		        "enablePullDownRefresh": false
+		        }
+		},
+		{
 			  "path": "pages/common/change-password",
 			  "style": {
 				"navigationBarTitleText": "修改密码",
