@@ -2,6 +2,7 @@ package com.hospital.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.hospital.common.Result;
+import com.hospital.dto.ChangePasswordDTO;
 import com.hospital.dto.LoginDTO;
 import com.hospital.dto.RegisterDTO;
 import com.hospital.dto.ResetPasswordDTO;
@@ -20,7 +21,7 @@ import java.util.Map;
 
 /**
  * 认证控制器
- * 负责处理登录、注册、重置密码等核心安全业务
+ * 负责处理登录、注册、重置密码、修改密码等核心安全业务
  */
 @RestController
 @RequestMapping("/api")
@@ -123,12 +124,12 @@ public class AuthController {
         return Result.success("注册成功");
     }
 
-    // ==================== 3. 重置密码接口 ====================
+    // ==================== 3. 重置密码接口 (忘记密码) ====================
     @PostMapping("/reset-password")
     public Result<String> resetPassword(@RequestBody ResetPasswordDTO resetDTO) {
         String role = resetDTO.getRole();
-        String account = resetDTO.getAccount(); // 手机号/工号/用户名
-        String name = resetDTO.getName();       // 真实姓名(用于验证)
+        String account = resetDTO.getAccount();
+        String name = resetDTO.getName();
         String newPassword = resetDTO.getNewPassword();
 
         if (role == null || account == null || name == null || newPassword == null) {
@@ -137,7 +138,6 @@ public class AuthController {
 
         // 3.1 患者重置
         if ("patient".equals(role)) {
-            // 校验账号和姓名是否匹配
             Patient patient = patientMapper.selectOne(new LambdaQueryWrapper<Patient>()
                     .eq(Patient::getPhone, account)
                     .eq(Patient::getRealName, name));
@@ -145,8 +145,6 @@ public class AuthController {
             if (patient == null) {
                 return Result.error("身份验证失败：手机号与姓名不匹配");
             }
-
-            // 更新密码
             patient.setPassword(newPassword);
             patientMapper.updateById(patient);
             return Result.success("密码重置成功");
@@ -161,7 +159,6 @@ public class AuthController {
             if (doctor == null) {
                 return Result.error("身份验证失败：工号与姓名不匹配");
             }
-
             doctor.setPassword(newPassword);
             doctorMapper.updateById(doctor);
             return Result.success("密码重置成功");
@@ -176,10 +173,63 @@ public class AuthController {
             if (admin == null) {
                 return Result.error("身份验证失败：账号与姓名不匹配");
             }
-
             admin.setPassword(newPassword);
             adminMapper.updateById(admin);
             return Result.success("密码重置成功");
+        }
+
+        return Result.error("未知角色类型");
+    }
+
+    // ==================== 4. 修改密码接口 (登录后修改) ====================
+    @PostMapping("/change-password")
+    public Result<String> changePassword(@RequestBody ChangePasswordDTO changeDTO) {
+        String role = changeDTO.getRole();
+        Long id = changeDTO.getId();
+        String oldPassword = changeDTO.getOldPassword();
+        String newPassword = changeDTO.getNewPassword();
+
+        if (role == null || id == null || oldPassword == null || newPassword == null) {
+            return Result.error("参数不完整");
+        }
+
+        // 4.1 患者修改
+        if ("patient".equals(role)) {
+            Patient patient = patientMapper.selectById(id);
+            if (patient == null) return Result.error("用户不存在");
+
+            if (!patient.getPassword().equals(oldPassword)) {
+                return Result.error("旧密码错误");
+            }
+            patient.setPassword(newPassword);
+            patientMapper.updateById(patient);
+            return Result.success("修改成功");
+        }
+
+        // 4.2 医生修改
+        else if ("doctor".equals(role)) {
+            Doctor doctor = doctorMapper.selectById(id);
+            if (doctor == null) return Result.error("用户不存在");
+
+            if (!doctor.getPassword().equals(oldPassword)) {
+                return Result.error("旧密码错误");
+            }
+            doctor.setPassword(newPassword);
+            doctorMapper.updateById(doctor);
+            return Result.success("修改成功");
+        }
+
+        // 4.3 管理员修改
+        else if ("admin".equals(role)) {
+            Admin admin = adminMapper.selectById(id);
+            if (admin == null) return Result.error("用户不存在");
+
+            if (!admin.getPassword().equals(oldPassword)) {
+                return Result.error("旧密码错误");
+            }
+            admin.setPassword(newPassword);
+            adminMapper.updateById(admin);
+            return Result.success("修改成功");
         }
 
         return Result.error("未知角色类型");

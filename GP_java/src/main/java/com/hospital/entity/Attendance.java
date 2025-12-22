@@ -4,22 +4,20 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("t_doctor")
-public class Doctor {
+@TableName("t_attendance")
+public class Attendance {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String jobNumber;
-    private String password;
-    private String realName;
-    private Long deptId;
-
-    // 新增字段
-    private String avatar;
-    private String gender;
-    private String introduction;
-
+    private Long doctorId;
+    private LocalDate date;
+    private LocalTime morningIn;
+    private LocalTime morningOut;
+    private LocalTime afternoonIn;
+    private LocalTime afternoonOut;
     private LocalDateTime createdTime;
 }

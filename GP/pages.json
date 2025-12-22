@@ -43,6 +43,13 @@
 		      "style": {
 		        "navigationBarTitleText": "管理员主页"
 		      }
+		},
+		{
+			  "path": "pages/common/change-password",
+			  "style": {
+				"navigationBarTitleText": "修改密码",
+				"navigationStyle": "custom"
+			}
 		}
 	],
 	"globalStyle": {

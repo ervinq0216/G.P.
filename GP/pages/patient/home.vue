@@ -65,6 +65,24 @@
             </view>
           </view>
         </view>
+        <view class="card list-card">
+          <view class="card-header">
+            <view class="header-line green"></view>
+            <text class="header-title">健康建议</text>
+            <text class="more-link">查看更多</text>
+          </view>
+          <view class="list-container">
+            <view 
+              v-for="(item, index) in healthTips" 
+              :key="index" 
+              class="list-item"
+              @click="goToDetail('health', item.id)"
+            >
+              <view class="dot green-dot"></view>
+              <text class="item-title">{{ item.title }}</text>
+            </view>
+          </view>
+        </view>
         <view style="height: 40rpx;"></view>
       </scroll-view>
 
@@ -151,7 +169,7 @@
         </view>
       </view>
 
-      <!-- Module D: 个人中心 (新增) -->
+      <!-- Module D: 个人中心 (更新了修改密码入口) -->
       <view class="module-profile" v-if="currentTab === 3">
         <!-- 头部信息 -->
         <view class="profile-header">
@@ -176,6 +194,14 @@
             <view class="menu-left">
               <text class="menu-icon">👤</text>
               <text class="menu-title">个人信息</text>
+            </view>
+            <text class="menu-arrow">></text>
+          </view>
+          
+          <view class="menu-item" @click="goToChangePassword">
+            <view class="menu-left">
+              <text class="menu-icon">🔒</text>
+              <text class="menu-title">修改密码</text>
             </view>
             <text class="menu-arrow">></text>
           </view>
@@ -225,7 +251,7 @@
 export default {
   data() {
     return {
-      tabs: ['医院简介', '科室导航', 'AI 咨询', '个人中心'], // 增加 Tab
+      tabs: ['医院简介', '科室导航', 'AI 咨询', '个人中心'],
       currentTab: 0,
       
       // 用户信息
@@ -268,14 +294,12 @@ export default {
     };
   },
   onShow() {
-    // 每次显示页面时，刷新用户信息 (因为可能在个人信息页修改了)
     const cachedUser = uni.getStorageSync('userInfo');
     if (cachedUser) {
       this.userInfo = cachedUser;
     }
   },
   methods: {
-    // 图片加载失败处理
     imageError(e) {
       console.log('图片加载失败');
     },
@@ -284,7 +308,6 @@ export default {
       if (index === 2) {
         if (!this.aiConfirmed) {
           this.showAIModal = true;
-          // 不切换，等确认
         } else {
           this.currentTab = index;
           this.scrollToBottom();
@@ -297,11 +320,10 @@ export default {
     confirmAI() {
       this.showAIModal = false;
       this.aiConfirmed = true;
-      this.currentTab = 2; // 确认后跳转
+      this.currentTab = 2;
       this.scrollToBottom();
     },
 
-    // AI 聊天相关方法
     sendMessage() {
       const msg = this.inputMessage.trim();
       if (!msg) return;
@@ -349,10 +371,16 @@ export default {
       }, 100);
     },
 
-    // --- 新增：个人中心相关方法 ---
     goToInfo() {
       uni.navigateTo({
         url: '/pages/patient/info'
+      });
+    },
+
+    // 新增：跳转修改密码页面
+    goToChangePassword() {
+      uni.navigateTo({
+        url: '/pages/common/change-password'
       });
     },
     
@@ -375,7 +403,6 @@ export default {
       uni.showToast({ title: msg, icon: 'none' });
     },
 
-    // 模拟功能
     openLocation() { uni.openLocation({ latitude: 39.909, longitude: 116.397, name: 'XX医院', address: 'XX大道' }); },
     makePhoneCall() { uni.makePhoneCall({ phoneNumber: '01012345678' }); },
     goToDetail(type, id) { uni.showToast({ title: `查看详情 ID:${id}`, icon: 'none' }); },
