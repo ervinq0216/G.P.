@@ -12,7 +12,7 @@
 
     <view class="content-area">
       
-      <!-- Module 1: 签到签退 -->
+      <!-- Module 1: 签到签退 (保持不变) -->
       <scroll-view scroll-y class="module-checkin" v-if="currentTab === 0">
         <view class="calendar-card">
           <view class="calendar-header">
@@ -28,7 +28,6 @@
                   :class="{ 'is-today': day.isToday, 'selected': day.dateStr === selectedDateStr }"
                   @click="selectDate(day)">
               <text class="day-num">{{ day.day }}</text>
-              <!-- 这里的 dot 是考勤记录标记(绿色)，选中状态是蓝色背景 -->
               <view class="dot" v-if="day.hasRecord"></view>
             </view>
           </view>
@@ -75,7 +74,7 @@
         <view style="height: 40rpx;"></view>
       </scroll-view>
 
-      <!-- Module 2: 今日病患 -->
+      <!-- Module 2: 今日病患 (保持不变) -->
       <view class="module-patient" v-if="currentTab === 1">
         <view class="empty-box">
           <image src="/static/logo.png" class="empty-img" mode="aspectFit" style="opacity: 0.3;"></image>
@@ -105,6 +104,14 @@
             <view class="menu-left">
               <text class="icon">🔒</text>
               <text>修改密码</text>
+            </view>
+            <text class="arrow">></text>
+          </view>
+          <!-- 新增：消息通知按钮 -->
+          <view class="menu-item" @click="showToast('消息通知功能开发中')">
+            <view class="menu-left">
+              <text class="icon">🔔</text>
+              <text>消息通知</text>
             </view>
             <text class="arrow">></text>
           </view>
@@ -337,6 +344,7 @@ export default {
 .day-num { font-size: 30rpx; color: #333; width: 60rpx; height: 60rpx; line-height: 60rpx; text-align: center; border-radius: 50%; }
 .is-today .day-num { background: #e6f7ff; color: #2b86ff; font-weight: bold; }
 .selected .day-num { background: #2b86ff !important; color: #fff !important; }
+.dot { width: 8rpx; height: 8rpx; background: #52c41a; border-radius: 50%; position: absolute; bottom: 10rpx; }
 
 .detail-card { background: #fff; border-radius: 20rpx; padding: 30rpx; box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.03); }
 .date-title { font-size: 32rpx; font-weight: bold; border-left: 8rpx solid #2b86ff; padding-left: 20rpx; display: block; margin-bottom: 30rpx; }
