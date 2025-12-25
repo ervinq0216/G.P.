@@ -1,9 +1,0 @@
-cd "E:\Documents\Graduation Project"
-
-git status
-
-git add .
-
-git commit -m "描述更新的部分"
-
-git push
