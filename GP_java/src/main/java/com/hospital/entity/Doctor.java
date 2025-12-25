@@ -16,10 +16,10 @@ public class Doctor {
     private String realName;
     private Long deptId;
 
-    // 新增字段
     private String avatar;
     private String gender;
     private String introduction;
 
+    private LocalDateTime lastReadTime; // 新增：最后阅读时间
     private LocalDateTime createdTime;
 }

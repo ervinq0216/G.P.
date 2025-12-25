@@ -38,6 +38,13 @@
 		        "navigationBarTitleText": "医生主页"
 		      }
 		},
+		    {
+		    	"path": "pages/doctor/messages",
+		    	"style": {
+		    		"navigationBarTitleText": "消息通知",
+		    		"enablePullDownRefresh": false
+		    	}
+		    },
 		{
 		      "path": "pages/admin/home",
 		      "style": {

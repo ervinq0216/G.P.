@@ -58,14 +58,13 @@
         </view>
       </view>
 
-      <!-- Module 2: 管理员管理 (已修改) -->
+      <!-- Module 2: 管理员管理 -->
       <view v-if="currentNav === 1" class="module-admin">
         <view class="panel">
           <button class="big-add-btn" @click="showAddAdminModal = true">+ 新增管理员</button>
           <scroll-view scroll-y class="list-scroll">
             <view class="list-item" v-for="adm in adminList" :key="adm.id">
               <view class="info">
-                <!-- 修改：直接显示账号 -->
                 <text class="name">{{ adm.username }}</text>
                 <text class="sub">系统管理员</text>
               </view>
@@ -112,7 +111,7 @@
         </view>
       </view>
 
-      <!-- Module 4: 通知和建议 -->
+      <!-- Module 4: 通知和建议 (更新了通知对象) -->
       <view v-if="currentNav === 3" class="module-notice">
         <view class="sub-tabs">
           <view :class="{ active: subTab4 === 0 }" @click="switchNoticeTab(0)">通知管理</view>
@@ -125,6 +124,7 @@
             <input class="input" v-model="noticeForm.title" placeholder="通知标题" />
             <textarea class="textarea" v-model="noticeForm.content" placeholder="通知内容..." />
             
+            <!-- 发布对象选择 -->
             <view class="target-select">
               <text class="label">发布对象:</text>
               <picker mode="selector" :range="targetOptions" range-key="label" @change="onTargetTypeChange">
@@ -132,6 +132,7 @@
               </picker>
             </view>
             
+            <!-- 如果选择了特定科室，显示科室选择器 -->
             <view class="target-select" v-if="noticeForm.targetType === 'dept'">
               <text class="label">选择科室:</text>
               <picker mode="selector" :range="deptList" range-key="name" @change="onNoticeDeptChange">
@@ -176,11 +177,10 @@
         </view>
       </view>
 
-      <!-- Module 5: 个人中心 (已修改) -->
+      <!-- Module 5: 个人中心 -->
       <view v-if="currentNav === 4" class="module-profile">
         <view class="profile-card">
           <image src="/static/default_avatar.png" class="avatar"></image>
-          <!-- 修改：显示 username 而不是 realName -->
           <text class="name">{{ userInfo.username || '管理员' }}</text>
           <text class="role">系统管理员</text>
         </view>
@@ -224,7 +224,7 @@
       </view>
     </view>
 
-    <!-- 弹窗：新增管理员 (已修改，移除姓名输入) -->
+    <!-- 弹窗：新增管理员 -->
     <view class="modal-mask" v-if="showAddAdminModal">
       <view class="modal-content">
         <view class="modal-title">新增管理员</view>
@@ -248,7 +248,7 @@ export default {
       currentNav: 0,
       subTab1: 0,
       subTab3: 0,
-      subTab4: 0,
+      subTab4: 0, // 通知建议的二级导航
       userInfo: {},
 
       // 数据列表
@@ -268,7 +268,6 @@ export default {
 
       deptForm: { id: null, category: '', name: '', intro: '' },
       doctorForm: { realName: '', jobNumber: '', deptId: null },
-      // 修改：adminForm 移除 realName
       adminForm: { username: '' },
       
       noticeForm: { title: '', content: '', targetType: 'all', targetDeptId: null, targetDeptName: '' },
@@ -276,8 +275,10 @@ export default {
       
       selectedDeptName: '',
       
+      // 目标类型选项 (已增加 "全部医生")
       targetOptions: [
         { label: '全部医生和患者', value: 'all' },
+        { label: '全部医生', value: 'doctor' }, // <--- 新增项
         { label: '全部患者', value: 'patient' },
         { label: '特定科室医生', value: 'dept' }
       ]
@@ -305,7 +306,8 @@ export default {
       } else if (this.currentNav === 2) {
         this.fetchLeaves();
       } else if (this.currentNav === 3) {
-        this.fetchDepts();
+        // 加载通知模块数据
+        this.fetchDepts(); // 需要科室列表选择目标
         if (this.subTab4 === 0) this.fetchNoticesByType('notice');
         else this.fetchNoticesByType('suggestion');
       }
@@ -414,7 +416,6 @@ export default {
     getDeptName(id) { const d = this.deptList.find(x => x.id === id); return d ? d.name : '未知科室'; },
 
     saveAdmin() {
-      // 修改：移除 realName
       uni.request({ url: 'http://localhost:8080/api/admin/add', method: 'POST', data: this.adminForm, success: res => { if(res.data.code === 200) { this.showAddAdminModal = false; this.fetchAdmins(); uni.showToast({ title: '添加成功' }); } else { uni.showToast({ title: res.data.msg, icon: 'none' }); } } });
     },
     deleteAdmin(id) { uni.request({ url: `http://localhost:8080/api/admin/delete/${id}`, method: 'POST', success: () => this.fetchAdmins() }); },
