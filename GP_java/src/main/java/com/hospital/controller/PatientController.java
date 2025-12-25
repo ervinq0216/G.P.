@@ -2,10 +2,8 @@ package com.hospital.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.hospital.common.Result;
-import com.hospital.entity.Notice;
-import com.hospital.entity.Patient;
-import com.hospital.mapper.NoticeMapper;
-import com.hospital.mapper.PatientMapper;
+import com.hospital.entity.*;
+import com.hospital.mapper.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,29 +16,12 @@ public class PatientController {
 
     @Autowired
     private PatientMapper patientMapper;
-
     @Autowired
     private NoticeMapper noticeMapper;
-
-    @PostMapping("/update")
-    public Result<Patient> updateInfo(@RequestBody Patient patient) {
-        if (patient.getId() == null) {
-            return Result.error("用户ID不能为空，请重新登录");
-        }
-        try {
-            int rows = patientMapper.updateById(patient);
-            if (rows > 0) {
-                Patient updatedPatient = patientMapper.selectById(patient.getId());
-                if (updatedPatient != null) updatedPatient.setPassword(null);
-                return Result.success(updatedPatient);
-            } else {
-                return Result.error("更新失败，未找到该用户");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            return Result.error("系统异常: " + e.getMessage());
-        }
-    }
+    @Autowired
+    private DepartmentMapper deptMapper;
+    @Autowired
+    private DoctorMapper doctorMapper;
 
     @GetMapping("/info/{id}")
     public Result<Patient> getInfo(@PathVariable Long id) {
@@ -52,30 +33,34 @@ public class PatientController {
         return Result.error("用户不存在");
     }
 
-    /**
-     * 获取健康建议 (同步管理员发布的 suggestion)
-     */
-    @GetMapping("/health-tips")
-    public Result<List<Notice>> getHealthTips() {
-        // 查询类型为 suggestion 的最新的5条记录
-        List<Notice> list = noticeMapper.selectList(new LambdaQueryWrapper<Notice>()
-                .eq(Notice::getType, "suggestion")
-                .orderByDesc(Notice::getCreatedTime)
-                .last("LIMIT 5"));
+    // --- 获取真实科室列表 ---
+    @GetMapping("/dept/list")
+    public Result<List<Department>> listDepts() {
+        return Result.success(deptMapper.selectList(null));
+    }
+
+    // --- 核心修复：按科室ID查询医生 ---
+    @GetMapping("/doctor/list")
+    public Result<List<Doctor>> listDoctorsByDept(@RequestParam Long deptId) {
+        LambdaQueryWrapper<Doctor> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Doctor::getDeptId, deptId); // 严格过滤科室ID
+        List<Doctor> list = doctorMapper.selectList(wrapper);
+        // 隐藏敏感信息
+        list.forEach(d -> d.setPassword(null));
         return Result.success(list);
     }
 
-    /**
-     * 获取医院公告 (同步管理员发布的 notice 且 targetType 包含患者)
-     */
+    @GetMapping("/health-tips")
+    public Result<List<Notice>> getHealthTips() {
+        return Result.success(noticeMapper.selectList(new LambdaQueryWrapper<Notice>()
+                .eq(Notice::getType, "suggestion").orderByDesc(Notice::getCreatedTime).last("LIMIT 5")));
+    }
+
     @GetMapping("/announcements")
     public Result<List<Notice>> getAnnouncements() {
-        // 目标类型是 all 或者 patient
-        List<Notice> list = noticeMapper.selectList(new LambdaQueryWrapper<Notice>()
+        return Result.success(noticeMapper.selectList(new LambdaQueryWrapper<Notice>()
                 .eq(Notice::getType, "notice")
                 .and(w -> w.eq(Notice::getTargetType, "all").or().eq(Notice::getTargetType, "patient"))
-                .orderByDesc(Notice::getCreatedTime)
-                .last("LIMIT 5"));
-        return Result.success(list);
+                .orderByDesc(Notice::getCreatedTime).last("LIMIT 5")));
     }
 }
