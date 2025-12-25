@@ -28,11 +28,13 @@
               <button class="mini-btn" @click="openDeptModal('add', cat)">+ 新增</button>
             </view>
             <view class="dept-grid">
-              <view class="dept-card" v-for="dept in getDeptsByCategory(cat)" :key="dept.id">
+              <view class="dept-card" v-for="dept in getDeptsByCategory(cat)" :key="dept.id" @click="viewDeptDoctors(dept)">
                 <text class="dept-name">{{ dept.name }}</text>
+                <text class="dept-hint">点击查看医生</text>
                 <view class="actions">
-                  <text class="edit" @click="openDeptModal('edit', null, dept)">✎</text>
-                  <text class="del" @click="deleteDept(dept.id)">×</text>
+                  <!-- 阻止冒泡，避免触发查看医生 -->
+                  <text class="edit" @click.stop="openDeptModal('edit', null, dept)">✎</text>
+                  <text class="del" @click.stop="deleteDept(dept.id)">×</text>
                 </view>
               </view>
             </view>
@@ -89,7 +91,7 @@
                 <text class="name">{{ leave.doctorName }}</text>
                 <text class="tag">{{ leave.type }}</text>
               </view>
-              <text class="desc">{{ leave.startDate }} 至 {{ leave.endDate }}</text>
+              <text class="desc">{{ leave.startDate }} ({{ leave.period }}) 至 {{ leave.endDate }}</text>
               <text class="reason">理由：{{ leave.reason }}</text>
               <view class="btn-row" v-if="leave.status === 'pending'">
                 <button class="audit-btn pass" @click="auditLeave(leave.id, 'approved')">批准</button>
@@ -111,7 +113,7 @@
         </view>
       </view>
 
-      <!-- Module 4: 通知和建议 (更新了通知对象) -->
+      <!-- Module 4: 通知和建议 -->
       <view v-if="currentNav === 3" class="module-notice">
         <view class="sub-tabs">
           <view :class="{ active: subTab4 === 0 }" @click="switchNoticeTab(0)">通知管理</view>
@@ -124,7 +126,6 @@
             <input class="input" v-model="noticeForm.title" placeholder="通知标题" />
             <textarea class="textarea" v-model="noticeForm.content" placeholder="通知内容..." />
             
-            <!-- 发布对象选择 -->
             <view class="target-select">
               <text class="label">发布对象:</text>
               <picker mode="selector" :range="targetOptions" range-key="label" @change="onTargetTypeChange">
@@ -132,7 +133,6 @@
               </picker>
             </view>
             
-            <!-- 如果选择了特定科室，显示科室选择器 -->
             <view class="target-select" v-if="noticeForm.targetType === 'dept'">
               <text class="label">选择科室:</text>
               <picker mode="selector" :range="deptList" range-key="name" @change="onNoticeDeptChange">
@@ -194,7 +194,9 @@
 
     </view>
 
-    <!-- 弹窗：新增/编辑科室 -->
+    <!-- ================= 弹窗区域 ================= -->
+
+    <!-- 1. 新增/编辑科室 -->
     <view class="modal-mask" v-if="showDeptModal">
       <view class="modal-content">
         <view class="modal-title">{{ deptForm.id ? '编辑' : '新增' }}科室</view>
@@ -207,7 +209,27 @@
       </view>
     </view>
 
-    <!-- 弹窗：新增医生 -->
+    <!-- 2. 查看科室医生 (新增) -->
+    <view class="modal-mask" v-if="showDeptDoctorsModal">
+      <view class="modal-content large">
+        <view class="modal-header">
+          <text class="modal-title">{{ selectedDept.name }} - 医生列表</text>
+          <text class="close-icon" @click="showDeptDoctorsModal = false">×</text>
+        </view>
+        <scroll-view scroll-y class="modal-list">
+          <view class="list-item" v-for="doc in currentDeptDoctors" :key="doc.id">
+            <view class="info">
+              <text class="name">{{ doc.realName }}</text>
+              <text class="sub">工号: {{ doc.jobNumber }}</text>
+            </view>
+            <text class="status-text">{{ doc.gender || '未知性别' }}</text>
+          </view>
+          <view v-if="currentDeptDoctors.length === 0" class="empty">该科室暂无医生</view>
+        </scroll-view>
+      </view>
+    </view>
+
+    <!-- 3. 新增医生 -->
     <view class="modal-mask" v-if="showAddDoctorModal">
       <view class="modal-content">
         <view class="modal-title">新增医生</view>
@@ -224,7 +246,7 @@
       </view>
     </view>
 
-    <!-- 弹窗：新增管理员 -->
+    <!-- 4. 新增管理员 -->
     <view class="modal-mask" v-if="showAddAdminModal">
       <view class="modal-content">
         <view class="modal-title">新增管理员</view>
@@ -245,40 +267,27 @@ export default {
   data() {
     return {
       navs: ['科室/医生', '管理员', '考勤请假', '通知建议', '个人中心'],
-      currentNav: 0,
-      subTab1: 0,
-      subTab3: 0,
-      subTab4: 0, // 通知建议的二级导航
-      userInfo: {},
-
-      // 数据列表
-      deptList: [],
-      doctorList: [],
-      adminList: [],
-      leaveList: [],
-      noticeList: [],
-      suggestionList: [],
-
-      // 搜索与表单
+      currentNav: 0, subTab1: 0, subTab3: 0, subTab4: 0, userInfo: {},
+      deptList: [], doctorList: [], adminList: [], leaveList: [], noticeList: [], suggestionList: [],
       searchKeyword: '',
       
-      showDeptModal: false,
-      showAddDoctorModal: false,
-      showAddAdminModal: false,
+      // 弹窗控制
+      showDeptModal: false, showAddDoctorModal: false, showAddAdminModal: false,
+      showDeptDoctorsModal: false, // 新增：科室医生弹窗
 
       deptForm: { id: null, category: '', name: '', intro: '' },
       doctorForm: { realName: '', jobNumber: '', deptId: null },
       adminForm: { username: '' },
-      
       noticeForm: { title: '', content: '', targetType: 'all', targetDeptId: null, targetDeptName: '' },
       suggestionForm: { title: '', content: '' },
       
       selectedDeptName: '',
+      selectedDept: {}, // 当前选中的科室对象
+      currentDeptDoctors: [], // 当前选中科室的医生列表
       
-      // 目标类型选项 (已增加 "全部医生")
       targetOptions: [
         { label: '全部医生和患者', value: 'all' },
-        { label: '全部医生', value: 'doctor' }, // <--- 新增项
+        { label: '全部医生', value: 'doctor' },
         { label: '全部患者', value: 'patient' },
         { label: '特定科室医生', value: 'dept' }
       ]
@@ -306,97 +315,13 @@ export default {
       } else if (this.currentNav === 2) {
         this.fetchLeaves();
       } else if (this.currentNav === 3) {
-        // 加载通知模块数据
-        this.fetchDepts(); // 需要科室列表选择目标
+        this.fetchDepts();
         if (this.subTab4 === 0) this.fetchNoticesByType('notice');
         else this.fetchNoticesByType('suggestion');
       }
     },
 
-    // --- API 调用 ---
-    fetchDepts() {
-      uni.request({ url: 'http://localhost:8080/api/admin/dept/list', success: r => this.deptList = r.data.data });
-    },
-    fetchDoctors() {
-      uni.request({ 
-        url: 'http://localhost:8080/api/admin/doctor/list', 
-        data: { keyword: this.searchKeyword },
-        success: r => this.doctorList = r.data.data 
-      });
-    },
-    fetchAdmins() {
-      uni.request({ url: 'http://localhost:8080/api/admin/list', success: r => this.adminList = r.data.data });
-    },
-    fetchLeaves() {
-      uni.request({ url: 'http://localhost:8080/api/admin/leave/list', success: r => this.leaveList = r.data.data });
-    },
-    fetchNoticesByType(type) {
-      uni.request({
-        url: 'http://localhost:8080/api/admin/notice/list',
-        data: { type: type },
-        success: (res) => {
-          if (type === 'notice') this.noticeList = res.data.data;
-          else this.suggestionList = res.data.data;
-        }
-      });
-    },
-
-    // --- 业务逻辑 ---
-    getTargetLabel(val) {
-      const opt = this.targetOptions.find(o => o.value === val);
-      return opt ? opt.label : '全部';
-    },
-    onTargetTypeChange(e) {
-      this.noticeForm.targetType = this.targetOptions[e.detail.value].value;
-    },
-    onNoticeDeptChange(e) {
-      const dept = this.deptList[e.detail.value];
-      this.noticeForm.targetDeptId = dept.id;
-      this.noticeForm.targetDeptName = dept.name;
-    },
-    publishNotice(type) {
-      let data = {};
-      if (type === 'notice') {
-        data = { ...this.noticeForm, type: 'notice' };
-        if (!data.title || !data.content) return uni.showToast({ title: '请填写完整', icon: 'none' });
-        if (data.targetType === 'dept' && !data.targetDeptId) return uni.showToast({ title: '请选择科室', icon: 'none' });
-      } else {
-        data = { ...this.suggestionForm, type: 'suggestion', targetType: 'patient' };
-        if (!data.title || !data.content) return uni.showToast({ title: '请填写完整', icon: 'none' });
-      }
-      uni.request({
-        url: 'http://localhost:8080/api/admin/notice/save',
-        method: 'POST',
-        data: data,
-        success: () => {
-          if (type === 'notice') {
-            this.noticeForm = { title: '', content: '', targetType: 'all', targetDeptId: null, targetDeptName: '' };
-            this.fetchNoticesByType('notice');
-          } else {
-            this.suggestionForm = { title: '', content: '' };
-            this.fetchNoticesByType('suggestion');
-          }
-          uni.showToast({ title: '发布成功' });
-        }
-      });
-    },
-    deleteNotice(id) {
-      uni.showModal({
-        title: '确认删除?',
-        success: r => {
-          if(r.confirm) {
-            uni.request({
-              url: `http://localhost:8080/api/admin/notice/delete/${id}`,
-              method: 'POST',
-              success: () => {
-                this.fetchNoticesByType(this.subTab4 === 0 ? 'notice' : 'suggestion');
-              }
-            });
-          }
-        }
-      });
-    },
-
+    // --- 科室操作 ---
     getDeptsByCategory(cat) { return this.deptList.filter(d => d.category === cat); },
     openDeptModal(type, category, dept) {
       if (type === 'add') { this.deptForm = { id: null, category: category, name: '', intro: '' }; } 
@@ -407,36 +332,74 @@ export default {
       uni.request({ url: 'http://localhost:8080/api/admin/dept/save', method: 'POST', data: this.deptForm, success: (res) => { if(res.data.code === 200) { this.showDeptModal = false; this.fetchDepts(); uni.showToast({ title: '保存成功' }); } } });
     },
     deleteDept(id) { uni.showModal({ title: '确认删除?', success: r => { if(r.confirm) { uni.request({ url: `http://localhost:8080/api/admin/dept/delete/${id}`, method: 'POST', success: () => this.fetchDepts() }); } } }); },
+    
+    // --- 新增：查看科室医生 ---
+    viewDeptDoctors(dept) {
+      this.selectedDept = dept;
+      uni.showLoading({ title: '加载中' });
+      uni.request({
+        url: 'http://localhost:8080/api/admin/doctor/list',
+        data: { deptId: dept.id },
+        success: (res) => {
+          uni.hideLoading();
+          if (res.data.code === 200) {
+            this.currentDeptDoctors = res.data.data;
+            this.showDeptDoctorsModal = true;
+          }
+        }
+      });
+    },
 
+    // --- 医生操作 ---
     onDeptChange(e) { const idx = e.detail.value; this.doctorForm.deptId = this.deptList[idx].id; this.selectedDeptName = this.deptList[idx].name; },
     saveDoctor() {
       uni.request({ url: 'http://localhost:8080/api/admin/doctor/add', method: 'POST', data: this.doctorForm, success: (res) => { if (res.data.code === 200) { this.showAddDoctorModal = false; this.doctorForm = { realName: '', jobNumber: '', deptId: null }; this.selectedDeptName = ''; this.fetchDoctors(); uni.showToast({ title: '添加成功' }); } else { uni.showToast({ title: res.data.msg, icon: 'none' }); } } });
     },
     deleteDoctor(id) { uni.showModal({ title: '确认删除?', success: r => { if(r.confirm) { uni.request({ url: `http://localhost:8080/api/admin/doctor/delete/${id}`, method: 'POST', success: () => this.fetchDoctors() }); } } }); },
-    getDeptName(id) { const d = this.deptList.find(x => x.id === id); return d ? d.name : '未知科室'; },
-
-    saveAdmin() {
-      uni.request({ url: 'http://localhost:8080/api/admin/add', method: 'POST', data: this.adminForm, success: res => { if(res.data.code === 200) { this.showAddAdminModal = false; this.fetchAdmins(); uni.showToast({ title: '添加成功' }); } else { uni.showToast({ title: res.data.msg, icon: 'none' }); } } });
+    
+    // --- 通用方法 ---
+    fetchDepts() { uni.request({ url: 'http://localhost:8080/api/admin/dept/list', success: r => this.deptList = r.data.data }); },
+    fetchDoctors() { uni.request({ url: 'http://localhost:8080/api/admin/doctor/list', data: { keyword: this.searchKeyword }, success: r => this.doctorList = r.data.data }); },
+    fetchAdmins() { uni.request({ url: 'http://localhost:8080/api/admin/list', success: r => this.adminList = r.data.data }); },
+    fetchLeaves() { uni.request({ url: 'http://localhost:8080/api/admin/leave/list', success: r => this.leaveList = r.data.data }); },
+    fetchNoticesByType(type) { uni.request({ url: 'http://localhost:8080/api/admin/notice/list', data: { type: type }, success: (res) => { if (type === 'notice') this.noticeList = res.data.data; else this.suggestionList = res.data.data; } }); },
+    
+    // ... 其他未变方法 ...
+    getTargetLabel(val) { const opt = this.targetOptions.find(o => o.value === val); return opt ? opt.label : '全部'; },
+    onTargetTypeChange(e) { this.noticeForm.targetType = this.targetOptions[e.detail.value].value; },
+    onNoticeDeptChange(e) { const dept = this.deptList[e.detail.value]; this.noticeForm.targetDeptId = dept.id; this.noticeForm.targetDeptName = dept.name; },
+    publishNotice(type) {
+      let data = {};
+      if (type === 'notice') {
+        data = { ...this.noticeForm, type: 'notice' };
+        if (!data.title || !data.content) return uni.showToast({ title: '请填写完整', icon: 'none' });
+        if (data.targetType === 'dept' && !data.targetDeptId) return uni.showToast({ title: '请选择科室', icon: 'none' });
+      } else {
+        data = { ...this.suggestionForm, type: 'suggestion', targetType: 'patient' };
+        if (!data.title || !data.content) return uni.showToast({ title: '请填写完整', icon: 'none' });
+      }
+      uni.request({ url: 'http://localhost:8080/api/admin/notice/save', method: 'POST', data, success: () => { if (type === 'notice') { this.noticeForm = { title: '', content: '', targetType: 'all', targetDeptId: null, targetDeptName: '' }; this.fetchNoticesByType('notice'); } else { this.suggestionForm = { title: '', content: '' }; this.fetchNoticesByType('suggestion'); } uni.showToast({ title: '发布成功' }); } });
     },
+    deleteNotice(id) { uni.showModal({ title: '确认删除?', success: r => { if(r.confirm) { uni.request({ url: `http://localhost:8080/api/admin/notice/delete/${id}`, method: 'POST', success: () => { this.fetchNoticesByType(this.subTab4 === 0 ? 'notice' : 'suggestion'); } }); } } }); },
+    getDeptName(id) { const d = this.deptList.find(x => x.id === id); return d ? d.name : '未知科室'; },
+    saveAdmin() { uni.request({ url: 'http://localhost:8080/api/admin/add', method: 'POST', data: this.adminForm, success: res => { if(res.data.code === 200) { this.showAddAdminModal = false; this.fetchAdmins(); uni.showToast({ title: '添加成功' }); } else { uni.showToast({ title: res.data.msg, icon: 'none' }); } } }); },
     deleteAdmin(id) { uni.request({ url: `http://localhost:8080/api/admin/delete/${id}`, method: 'POST', success: () => this.fetchAdmins() }); },
     auditLeave(id, status) { uni.request({ url: 'http://localhost:8080/api/admin/leave/audit', method: 'POST', data: { id, status }, success: () => { this.fetchLeaves(); uni.showToast({ title: '已处理' }); } }); },
-
     formatDate(timeStr) { if(!timeStr) return ''; return timeStr.split('T')[0]; },
     goToPage(url) { uni.navigateTo({ url }); },
-    handleLogout() {
-      uni.removeStorageSync('userInfo');
-      uni.reLaunch({ url: '/pages/login/index' });
-    }
+    handleLogout() { uni.removeStorageSync('userInfo'); uni.reLaunch({ url: '/pages/login/index' }); }
   }
 };
 </script>
 
 <style>
-/* 保持原有样式，省略部分以节省空间 */
+/* 保持原有样式，增加大弹窗样式 */
 .container { height: 100vh; display: flex; flex-direction: column; background-color: #f5f7fa; }
 .nav-bar { white-space: nowrap; height: 90rpx; background: #fff; border-bottom: 1rpx solid #eee; }
-.nav-item { display: inline-block; padding: 0 30rpx; line-height: 90rpx; font-size: 30rpx; color: #666; }
+.nav-item { display: inline-block; padding: 0 30rpx; line-height: 90rpx; font-size: 30rpx; color: #666; position: relative; } /* position: relative for dot */
 .nav-item.active { color: #2b86ff; font-weight: bold; border-bottom: 4rpx solid #2b86ff; }
+.red-dot-small { width: 12rpx; height: 12rpx; background: #ff4d4f; border-radius: 50%; position: absolute; top: 20rpx; right: 20rpx; }
+
 .content-area { flex: 1; overflow: hidden; padding: 20rpx; display: flex; flex-direction: column; }
 .sub-tabs { display: flex; margin-bottom: 20rpx; background: #fff; border-radius: 10rpx; overflow: hidden; }
 .sub-tabs view { flex: 1; text-align: center; padding: 20rpx 0; font-size: 28rpx; background: #eee; }
@@ -444,17 +407,16 @@ export default {
 .panel { background: #fff; border-radius: 16rpx; padding: 20rpx; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .list-scroll { flex: 1; overflow-y: auto; height: 0; }
 .list-scroll.half { height: 300rpx; flex: none; }
-/* 科室管理 */
 .category-row { margin-bottom: 30rpx; }
 .cat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16rpx; }
 .cat-title { font-weight: bold; border-left: 6rpx solid #2b86ff; padding-left: 10rpx; }
 .dept-grid { display: flex; flex-wrap: wrap; gap: 20rpx; }
 .dept-card { width: 30%; background: #f8f9fb; padding: 16rpx; border-radius: 8rpx; display: flex; flex-direction: column; align-items: center; position: relative; }
 .dept-name { font-size: 26rpx; text-align: center; }
+.dept-hint { font-size: 20rpx; color: #999; margin-top: 4rpx; }
 .actions { position: absolute; top: 4rpx; right: 4rpx; display: flex; gap: 10rpx; }
 .edit { color: #2b86ff; font-size: 24rpx; }
 .del { color: #ff4d4f; font-size: 24rpx; }
-/* 列表通用 */
 .search-bar { display: flex; gap: 20rpx; margin-bottom: 20rpx; }
 .search-input { flex: 1; background: #f5f5f5; height: 70rpx; padding: 0 20rpx; border-radius: 10rpx; }
 .search-btn, .add-btn { height: 70rpx; line-height: 70rpx; font-size: 24rpx; padding: 0 20rpx; }
@@ -466,7 +428,6 @@ export default {
 .sub { font-size: 24rpx; color: #999; }
 .mini-btn { font-size: 22rpx; padding: 0 20rpx; height: 50rpx; line-height: 50rpx; margin: 0; }
 .mini-btn.del { background: #ff4d4f; color: #fff; }
-/* 考勤请假 */
 .row-between { width: 100%; display: flex; justify-content: space-between; }
 .tag { font-size: 24rpx; background: #e6f7ff; color: #2b86ff; padding: 2rpx 10rpx; border-radius: 6rpx; }
 .desc { font-size: 26rpx; color: #666; margin: 10rpx 0; }
@@ -474,7 +435,6 @@ export default {
 .audit-btn { font-size: 24rpx; height: 50rpx; line-height: 50rpx; }
 .pass { background: #52c41a; color: #fff; }
 .reject { background: #ff4d4f; color: #fff; }
-/* 通知 */
 .form-box { display: flex; flex-direction: column; gap: 20rpx; }
 .input { border: 1rpx solid #eee; height: 80rpx; padding: 0 20rpx; border-radius: 8rpx; }
 .textarea { border: 1rpx solid #eee; height: 160rpx; padding: 20rpx; border-radius: 8rpx; width: 100%; box-sizing: border-box; }
@@ -485,17 +445,19 @@ export default {
 .big-add-btn.green { background: #52c41a; }
 .divider { background: #f0f0f0; padding: 10rpx; text-align: center; color: #999; font-size: 24rpx; margin: 20rpx 0; }
 .hint-text { color: #999; font-size: 24rpx; text-align: center; margin-bottom: 20rpx; }
-/* 个人中心 */
 .profile-card { display: flex; flex-direction: column; align-items: center; padding: 60rpx 0; }
 .avatar { width: 140rpx; height: 140rpx; border-radius: 50%; margin-bottom: 20rpx; }
 .role { font-size: 24rpx; background: #333; color: #ffd700; padding: 4rpx 16rpx; border-radius: 20rpx; margin-top: 10rpx; }
 .menu-list { margin-top: 40rpx; }
 .menu-item { display: flex; justify-content: space-between; padding: 30rpx; border-bottom: 1rpx solid #eee; font-size: 30rpx; }
 .logout-btn { margin-top: 60rpx; background: #fff; color: #ff4d4f; }
-/* 弹窗 */
 .modal-mask { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 999; display: flex; align-items: center; justify-content: center; }
 .modal-content { width: 600rpx; background: #fff; border-radius: 16rpx; padding: 40rpx; }
-.modal-title { font-size: 32rpx; font-weight: bold; text-align: center; margin-bottom: 30rpx; }
+.modal-content.large { height: 70vh; display: flex; flex-direction: column; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30rpx; }
+.close-icon { font-size: 40rpx; color: #999; padding: 10rpx; }
+.modal-list { flex: 1; overflow-y: auto; }
+.modal-title { font-size: 32rpx; font-weight: bold; text-align: center; margin-bottom: 30rpx; flex: 1; }
 .modal-input { border: 1rpx solid #ddd; height: 80rpx; padding: 0 20rpx; margin-bottom: 20rpx; border-radius: 8rpx; }
 .modal-textarea { border: 1rpx solid #ddd; height: 150rpx; padding: 20rpx; width: 100%; box-sizing: border-box; margin-bottom: 20rpx; }
 .picker-box { border: 1rpx solid #ddd; height: 80rpx; line-height: 80rpx; padding: 0 20rpx; margin-bottom: 20rpx; color: #333; }

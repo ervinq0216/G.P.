@@ -120,6 +120,16 @@ public class AdminController {
         return Result.success(leaves);
     }
 
+    /**
+     * 获取待审批请假数量 (新增接口)
+     */
+    @GetMapping("/leave/pending-count")
+    public Result<Long> getPendingLeaveCount() {
+        Long count = leaveMapper.selectCount(new LambdaQueryWrapper<Leave>()
+                .eq(Leave::getStatus, "pending"));
+        return Result.success(count);
+    }
+
     @PostMapping("/leave/audit")
     public Result<String> auditLeave(@RequestBody Map<String, Object> params) {
         Long id = Long.valueOf(params.get("id").toString());
@@ -132,12 +142,7 @@ public class AdminController {
         return Result.success("审批完成");
     }
 
-    // ================= 通知与建议 (更新部分) =================
-
-    /**
-     * 获取通知列表 (支持按类型筛选)
-     * type: notice (通知管理) / suggestion (健康建议)
-     */
+    // ================= 通知与建议 =================
     @GetMapping("/notice/list")
     public Result<List<Notice>> listNotices(@RequestParam(required = false) String type) {
         LambdaQueryWrapper<Notice> wrapper = new LambdaQueryWrapper<>();

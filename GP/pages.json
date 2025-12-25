@@ -32,6 +32,13 @@
 						"navigationBarTitleText": "完善个人信息"
 					}
 				},
+				{
+					"path": "pages/patient/doctor-detail",
+					"style": {
+						"navigationBarTitleText": "医生详情",
+						"enablePullDownRefresh": false
+					}
+				},
 		    {
 		      "path": "pages/doctor/home",
 		      "style": {
