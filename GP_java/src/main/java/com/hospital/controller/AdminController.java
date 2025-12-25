@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -67,12 +66,11 @@ public class AdminController {
 
     @PostMapping("/doctor/add")
     public Result<String> addDoctor(@RequestBody Doctor doctor) {
-        // 检查工号是否存在
         Long count = doctorMapper.selectCount(new LambdaQueryWrapper<Doctor>()
                 .eq(Doctor::getJobNumber, doctor.getJobNumber()));
         if (count > 0) return Result.error("工号已存在");
 
-        doctor.setPassword("123456"); // 默认密码
+        doctor.setPassword("123456");
         doctor.setCreatedTime(LocalDateTime.now());
         doctorMapper.insert(doctor);
         return Result.success("添加成功");
@@ -96,7 +94,7 @@ public class AdminController {
                 .eq(Admin::getUsername, admin.getUsername()));
         if (count > 0) return Result.error("用户名已存在");
 
-        admin.setPassword("123456"); // 默认密码
+        admin.setPassword("123456");
         admin.setCreatedTime(LocalDateTime.now());
         adminMapper.insert(admin);
         return Result.success("添加成功");
@@ -115,7 +113,6 @@ public class AdminController {
                 .eq(Leave::getStatus, status)
                 .orderByDesc(Leave::getCreatedTime));
 
-        // 填充医生姓名 (简单实现，生产环境建议用 JOIN 或 Map 缓存)
         leaves.forEach(l -> {
             Doctor d = doctorMapper.selectById(l.getDoctorId());
             if(d != null) l.setDoctorName(d.getRealName());
@@ -126,7 +123,7 @@ public class AdminController {
     @PostMapping("/leave/audit")
     public Result<String> auditLeave(@RequestBody Map<String, Object> params) {
         Long id = Long.valueOf(params.get("id").toString());
-        String status = params.get("status").toString(); // approved / rejected
+        String status = params.get("status").toString();
 
         Leave leave = new Leave();
         leave.setId(id);
@@ -135,11 +132,20 @@ public class AdminController {
         return Result.success("审批完成");
     }
 
-    // ================= 通知与建议 =================
+    // ================= 通知与建议 (更新部分) =================
+
+    /**
+     * 获取通知列表 (支持按类型筛选)
+     * type: notice (通知管理) / suggestion (健康建议)
+     */
     @GetMapping("/notice/list")
-    public Result<List<Notice>> listNotices() {
-        return Result.success(noticeMapper.selectList(new LambdaQueryWrapper<Notice>()
-                .orderByDesc(Notice::getCreatedTime)));
+    public Result<List<Notice>> listNotices(@RequestParam(required = false) String type) {
+        LambdaQueryWrapper<Notice> wrapper = new LambdaQueryWrapper<>();
+        if (type != null && !type.isEmpty()) {
+            wrapper.eq(Notice::getType, type);
+        }
+        wrapper.orderByDesc(Notice::getCreatedTime);
+        return Result.success(noticeMapper.selectList(wrapper));
     }
 
     @PostMapping("/notice/save")
@@ -151,5 +157,11 @@ public class AdminController {
             noticeMapper.updateById(notice);
         }
         return Result.success("发布成功");
+    }
+
+    @PostMapping("/notice/delete/{id}")
+    public Result<String> deleteNotice(@PathVariable Long id) {
+        noticeMapper.deleteById(id);
+        return Result.success("删除成功");
     }
 }

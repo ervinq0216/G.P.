@@ -132,7 +132,11 @@ public class AuthController {
         String name = resetDTO.getName();
         String newPassword = resetDTO.getNewPassword();
 
-        if (role == null || account == null || name == null || newPassword == null) {
+        if (role == null || account == null || newPassword == null) {
+            return Result.error("信息填写不完整");
+        }
+        // 管理员不需要校验姓名，其他角色需要
+        if (!"admin".equals(role) && name == null) {
             return Result.error("信息填写不完整");
         }
 
@@ -166,12 +170,12 @@ public class AuthController {
 
         // 3.3 管理员重置
         else if ("admin".equals(role)) {
+            // 修改：管理员不再校验 realName，仅校验 username
             Admin admin = adminMapper.selectOne(new LambdaQueryWrapper<Admin>()
-                    .eq(Admin::getUsername, account)
-                    .eq(Admin::getRealName, name));
+                    .eq(Admin::getUsername, account));
 
             if (admin == null) {
-                return Result.error("身份验证失败：账号与姓名不匹配");
+                return Result.error("身份验证失败：账号不存在");
             }
             admin.setPassword(newPassword);
             adminMapper.updateById(admin);

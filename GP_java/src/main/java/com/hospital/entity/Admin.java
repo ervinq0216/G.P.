@@ -6,10 +6,6 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import java.time.LocalDateTime;
 
-/**
- * 管理员实体
- * 对应数据库表 t_admin
- */
 @Data
 @TableName("t_admin")
 public class Admin {
@@ -29,10 +25,6 @@ public class Admin {
      */
     private String password;
 
-    /**
-     * 管理员姓名
-     */
-    private String realName;
 
     /**
      * 创建时间
