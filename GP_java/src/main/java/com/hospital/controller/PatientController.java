@@ -9,9 +9,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * 患者端控制器 - 严格限定患者业务
- */
 @RestController
 @RequestMapping("/api/patient")
 @CrossOrigin(origins = "*")
@@ -19,18 +16,15 @@ public class PatientController {
 
     @Autowired
     private PatientMapper patientMapper;
-
     @Autowired
     private NoticeMapper noticeMapper;
-
     @Autowired
     private DepartmentMapper deptMapper;
-
     @Autowired
     private DoctorMapper doctorMapper;
 
     /**
-     * 获取患者信息 - 强制只查询患者表
+     * 核心修复：获取患者资料，严格限定查询 t_patient 表
      */
     @GetMapping("/info/{id}")
     public Result<Patient> getInfo(@PathVariable Long id) {
@@ -39,12 +33,9 @@ public class PatientController {
             p.setPassword(null); // 安全脱敏
             return Result.success(p);
         }
-        return Result.error("未找到该患者资料");
+        return Result.error("未找到患者资料");
     }
 
-    /**
-     * 更新患者资料
-     */
     @PostMapping("/update")
     public Result<Patient> updateInfo(@RequestBody Patient patient) {
         if (patient.getId() == null) return Result.error("ID不能为空");

@@ -106,14 +106,13 @@
 			</view>
 
 			<!-- Module D: 个人中心 -->
-			<!-- Module D: 个人中心 (核心修复点) -->
-						<view class="module-profile" v-if="currentTab === 3">
+			<view class="module-profile" v-if="currentTab === 3">
 							<view class="profile-header">
 								<view class="profile-bg-circle"></view>
 								<view class="user-info-box" @click="goToInfo">
 									<image :src="userInfo.avatar || '/static/default_avatar.png'" class="user-avatar-img" mode="aspectFill"></image>
 									<view class="user-text">
-										<text class="user-name">{{ userInfo.realName || '未填写姓名' }}</text>
+										<text class="user-name">{{ userInfo.realName || '患者用户' }}</text>
 										<text class="user-phone">{{ userInfo.phone || '账号未绑定' }}</text>
 									</view>
 									<text class="edit-hint">编辑 ></text>
@@ -126,13 +125,13 @@
 									<text class="menu-arrow">></text>
 								</view>
 								
-								<!-- 补全修改密码按钮 -->
+								<!-- 补齐修改密码按钮 -->
 								<view class="menu-item" @click="goToPage('/pages/common/change-password')">
 									<view class="menu-left"><text class="menu-icon">🔒</text><text class="menu-title">修改密码</text></view>
 									<text class="menu-arrow">></text>
 								</view>
 			
-								<view class="menu-item" @click="showToast('功能开发中')">
+								<view class="menu-item" @click="showToast('挂号历史正在开发中')">
 									<view class="menu-left"><text class="menu-icon">📋</text><text class="menu-title">我的挂号单</text></view>
 									<text class="menu-arrow">></text>
 								</view>
@@ -184,55 +183,86 @@
 </template>
 
 <script>
-	export default {
-		data() {
-			return {
-				tabs: ['医院简介', '科室导航', 'AI 咨询', '个人中心'],
-				currentTab: 0,
-				userInfo: {},
-				
-				// 医院动态数据
-				announcements: [],
-				healthTips: [],
-				
-				// 科室逻辑
-				categoryOrder: ['手术科室', '非手术科室', '诊断相关'],
-				currentCategoryIndex: 0,
-				allDepts: [],
-				
-				// 弹窗逻辑
-				showDeptModal: false,
-				selectedDept: {},
-				deptDoctors: [],
-
-				// AI 咨询相关
-				showAIModal: false,
-				aiConfirmed: false,
-				inputMessage: '',
-				chatList: [],
-				isAiLoading: false,
-				scrollTop: 0
-			};
+export default {
+	data() {
+		return {
+			tabs: ['医院简介', '科室导航', 'AI 咨询', '个人中心'],
+			currentTab: 0,
+			userInfo: {},
+			allDepts: [],
+			categoryOrder: ['手术科室', '非手术科室', '诊断相关'],
+			currentCategoryIndex: 0,
+			showDeptModal: false,
+			selectedDept: {},
+			deptDoctors: [],
+			announcements: [],
+			healthTips: [],
+			showAIModal: false,
+			aiConfirmed: false,
+			inputMessage: '',
+			chatList: [],
+			isAiLoading: false,
+			scrollTop: 0
+		};
+	},
+	computed: {
+		filteredDepts() {
+			const currentCatName = this.categoryOrder[this.currentCategoryIndex];
+			return this.allDepts.filter(d => d.category === currentCatName);
+		}
+	},
+	onShow() {
+		const cachedUser = uni.getStorageSync('userInfo');
+		const role = uni.getStorageSync('role');
+		
+		// === 核心修复：防止串号 ===
+		if (cachedUser && role === 'patient') {
+			this.userInfo = cachedUser;
+			// 只有角色正确，才去请求数据
+			this.fetchPatientInfo(); // 重新拉取患者表中的信息，覆盖缓存
+			this.fetchAnnouncements();
+			this.fetchHealthTips();
+			this.fetchDepts();
+		} else {
+			// 如果没有缓存，或者角色不对（例如上一次是医生登录），立即清理并踢出
+			uni.clearStorageSync();
+			uni.reLaunch({ url: '/pages/login/index' });
+		}
+	},
+	methods: {
+		fetchPatientInfo() {
+			uni.request({
+				// 强制指定患者 API
+				url: 'http://localhost:8080/api/patient/info/' + this.userInfo.id,
+				success: (res) => {
+					if (res.data.code === 200) {
+						this.userInfo = res.data.data;
+						// 安全更新缓存
+						const safeUser = { ...res.data.data };
+						delete safeUser.avatar; // 不存大头像到缓存
+						uni.setStorageSync('userInfo', safeUser);
+					}
+				}
+			});
 		},
-		computed: {
-			// 根据当前选择的侧边栏分类筛选科室
-			filteredDepts() {
-				const currentCatName = this.categoryOrder[this.currentCategoryIndex];
-				return this.allDepts.filter(d => d.category === currentCatName);
-			}
+		handleTabSwitch(index) {
+			if (index === 2 && !this.aiConfirmed) { this.showAIModal = true; } 
+			else { this.currentTab = index; if (index === 2) this.scrollToBottom(); }
 		},
-		onShow() {
-			const cachedUser = uni.getStorageSync('userInfo');
-			if (cachedUser) {
-				this.userInfo = cachedUser;
-				this.fetchAnnouncements();
-				this.fetchHealthTips();
-				this.fetchDepts();
-			} else {
-				uni.reLaunch({ url: '/pages/login/index' });
-			}
+		goToPage(url) { uni.navigateTo({ url }); },
+		goToInfo() { uni.navigateTo({ url: '/pages/patient/info' }); },
+		handleLogout() {
+			uni.showModal({
+				title: '提示',
+				content: '确定要退出登录吗？',
+				success: (res) => {
+					if (res.confirm) {
+						uni.clearStorageSync(); // 彻底清理缓存
+						uni.reLaunch({ url: '/pages/login/index' });
+					}
+				}
+			});
 		},
-		methods: {
 			// 获取真实科室列表
 			fetchDepts() {
 				uni.request({

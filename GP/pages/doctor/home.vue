@@ -95,21 +95,20 @@
       				<view class="profile-header">
       					<image :src="userInfo.avatar || '/static/default_avatar.png'" class="avatar-img" mode="aspectFill"></image>
       					<view class="user-info">
-      						<text class="name">{{ userInfo.realName || '医生' }}</text>
+      						<text class="name">{{ userInfo.realName || '医生用户' }}</text>
       						<text class="job-num">工号：{{ userInfo.jobNumber }}</text>
       					</view>
       				</view>
       
       				<view class="menu-list">
       					<view class="menu-item" @click="goToPage('/pages/doctor/info')">
-      						<view class="menu-left"><text class="icon">👤</text><text>编辑个人信息</text></view><text class="arrow">></text>
+      						<view class="menu-left"><text class="menu-icon">👤</text><text>编辑个人信息</text></view><text class="arrow">></text>
       					</view>
       					<view class="menu-item" @click="goToPage('/pages/common/change-password')">
       						<view class="menu-left"><text class="icon">🔒</text><text>修改密码</text></view><text class="arrow">></text>
       					</view>
       					<view class="menu-item" @click="goToPage('/pages/doctor/messages')">
-      						<view class="menu-left">
-      							<text class="icon">🔔</text><text>消息通知</text>
+      						<view class="menu-left"><text class="icon">🔔</text><text>消息通知</text>
       							<view class="badge" v-if="unreadCount > 0">{{ unreadCount }}</view>
       						</view>
       						<text class="arrow">></text>
@@ -120,7 +119,6 @@
       						</view>
       					</picker>
       				</view>
-      
       				<button class="logout-btn" @click="handleLogout">退出登录</button>
       			</view>
 
@@ -179,6 +177,23 @@ export default {
     }
   },
   onShow() {
+	  		const cachedUser = uni.getStorageSync('userInfo');
+	  		const role = uni.getStorageSync('role');
+	  		// 核心校验：必须是医生角色
+	  		if (cachedUser && role === 'doctor') {
+	  			this.userInfo = cachedUser;
+	  			this.fetchDoctorInfo(); 
+	  			this.fetchUnreadCount();
+	  			this.todayStr = this.getLocalTodayStr();
+	  			this.initCalendar();
+	  			this.fetchMonthRecords();
+	  			this.initWorkingDays();
+	  			this.fetchAppointments();
+	  		} else {
+	  			uni.clearStorageSync();
+	  			uni.reLaunch({ url: '/pages/login/index' });
+	  		}
+	  
     const user = uni.getStorageSync('userInfo');
     if (user) {
       this.userInfo = user; 
