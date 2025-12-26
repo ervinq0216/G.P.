@@ -14,9 +14,9 @@ public class Schedule {
     private Long id;
     private Long doctorId;
     private LocalDate workDate;
-    private String period; // 上午/下午
+    private String period; // 上午 / 下午
     private Integer totalQuota;
     private Integer bookedCount;
-    private String status; // available/leave
+    private String status; // available / leave
     private LocalDateTime createdTime;
 }

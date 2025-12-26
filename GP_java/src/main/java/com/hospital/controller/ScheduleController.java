@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,19 +26,16 @@ public class ScheduleController {
     private LeaveMapper leaveMapper;
 
     /**
-     * 获取医生预约排班列表
-     * 规则：包含今天在内的最近5个工作日
+     * 获取医生未来 6 个工作日的排班
      */
     @GetMapping("/list")
-    public Result<List<Schedule>> getDoctorSchedules(@RequestParam Long doctorId) {
+    public Result<List<Schedule>> listDoctorSchedules(@RequestParam Long doctorId) {
         LocalDate today = LocalDate.now();
-        LocalTime nowTime = LocalTime.now();
-
         List<LocalDate> workingDays = new ArrayList<>();
-        LocalDate checkDate = today; // 从今天开始检查
+        LocalDate checkDate = today;
 
-        // 1. 计算包含今天在内的未来5个工作日
-        while (workingDays.size() < 5) {
+        // 1. 计算包含今天在内的未来 6 个工作日 (修改此处)
+        while (workingDays.size() < 6) {
             if (checkDate.getDayOfWeek() != DayOfWeek.SATURDAY && checkDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
                 workingDays.add(checkDate);
             }
@@ -56,21 +52,9 @@ public class ScheduleController {
         List<Schedule> list = scheduleMapper.selectList(new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getDoctorId, doctorId)
                 .in(Schedule::getWorkDate, workingDays)
-                .orderByAsc(Schedule::getWorkDate, Schedule::getId));
+                .orderByAsc(Schedule::getWorkDate));
 
-        // 4. 处理“当天”的截止逻辑
-        for (Schedule s : list) {
-            if (s.getWorkDate().equals(today)) {
-                // 上午10点后不可预约当天上午
-                if ("上午".equals(s.getPeriod()) && nowTime.getHour() >= 10) {
-                    s.setStatus("expired"); // 标记为已过期/截止
-                }
-                // 下午17点后不可预约当天下午
-                if ("下午".equals(s.getPeriod()) && nowTime.getHour() >= 17) {
-                    s.setStatus("expired");
-                }
-            }
-        }
+        // 4. 处理“当天”的截止逻辑(略，前端或AppointmentController已处理)
 
         return Result.success(list);
     }
@@ -89,7 +73,7 @@ public class ScheduleController {
             newS.setTotalQuota(30);
             newS.setBookedCount(0);
 
-            // 校验医生请假情况
+            // 校验医生请假
             Long leaveCount = leaveMapper.selectCount(new LambdaQueryWrapper<Leave>()
                     .eq(Leave::getDoctorId, doctorId)
                     .eq(Leave::getStartDate, date)

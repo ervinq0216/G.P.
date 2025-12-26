@@ -1,56 +1,96 @@
 <template>
   <view class="container">
+    
+    <!-- 顶部 Tab -->
     <view class="nav-tabs">
       <view v-for="(tab, index) in tabs" :key="index" class="tab-item" 
             :class="{ active: currentTab === index }" @click="currentTab = index">
         <text class="tab-text">{{ tab }}</text>
-        <!-- 个人中心Tab如果有未读消息，显示小红点 -->
         <view class="tab-line" v-if="currentTab === index"></view>
         <view class="red-dot-small" v-if="index === 2 && unreadCount > 0"></view>
       </view>
     </view>
 
     <view class="content-area">
-      <!-- 模块1: 签到签退 (不变) -->
+      
+      <!-- Module 1: 签到签退 (保持不变) -->
       <scroll-view scroll-y class="module-checkin" v-if="currentTab === 0">
-         <!-- ...省略日历代码... -->
-         <view class="calendar-card">
-           <view class="calendar-header">
-             <text>{{ currentYear }}年{{ currentMonth }}月</text>
-             <view class="today-btn" @click="jumpToday">回到今天</view>
-           </view>
-           <view class="week-row">
-             <text v-for="d in ['日','一','二','三','四','五','六']" :key="d">{{d}}</text>
-           </view>
-           <view class="days-grid">
-             <view v-for="(day, idx) in days" :key="idx" class="day-cell" :class="{ 'is-today': day.isToday, 'selected': day.dateStr === selectedDateStr }" @click="selectDate(day)">
-               <text class="day-num">{{ day.day }}</text>
-               <view class="dot" v-if="day.hasRecord"></view>
-             </view>
-           </view>
-         </view>
-         <view class="detail-card">
-           <!-- ...省略打卡按钮... -->
-           <view class="record-row" v-for="(range, key) in checkRanges" :key="key">
-             <view class="time-info"><text class="time-label">{{ range.label }}</text><text class="time-range">{{ range.start }}-{{ range.end }}</text></view>
-             <view class="status-box">
-               <text v-if="currentRecord[key]" class="done">已打卡 {{ currentRecord[key] }}</text>
-               <button v-else-if="isToday" class="check-btn" :class="{ orange: key.includes('Out') }" @click="doCheck(key)">{{ key.includes('In') ? '签到' : '签退' }}</button>
-               <text v-else class="miss">未打卡</text>
-             </view>
-           </view>
-         </view>
+        <view class="calendar-card">
+          <view class="calendar-header">
+            <text>{{ currentYear }}年{{ currentMonth }}月</text>
+            <view class="today-btn" @click="jumpToday">回到今天</view>
+          </view>
+          <view class="week-row">
+            <text v-for="d in ['日','一','二','三','四','五','六']" :key="d">{{d}}</text>
+          </view>
+          <view class="days-grid">
+            <view v-for="(day, idx) in days" :key="idx" 
+                  class="day-cell" 
+                  :class="{ 'is-today': day.isToday, 'selected': day.dateStr === selectedDateStr }"
+                  @click="selectDate(day)">
+              <text class="day-num">{{ day.day }}</text>
+              <view class="dot" v-if="day.hasRecord"></view>
+            </view>
+          </view>
+        </view>
+
+        <view class="detail-card">
+          <view class="detail-header">
+            <text class="date-title">{{ selectedDateStr }} 考勤记录</text>
+          </view>
+          <view class="record-row" v-for="(range, key) in checkRanges" :key="key">
+            <view class="time-info">
+              <text class="time-label">{{ range.label }}</text>
+              <text class="time-range">{{ range.start }}-{{ range.end }}</text>
+            </view>
+            <view class="status-box">
+              <text v-if="currentRecord[key]" class="done">已打卡 {{ currentRecord[key] }}</text>
+              <button v-else-if="isToday" class="check-btn" :class="{ orange: key.includes('Out') }" @click="doCheck(key)">
+                {{ key.includes('In') ? '签到' : '签退' }}
+              </button>
+              <text v-else class="miss">未打卡</text>
+            </view>
+          </view>
+        </view>
+        <view style="height: 40rpx;"></view>
       </scroll-view>
 
-      <!-- 模块2: 今日病患 (不变) -->
+      <!-- Module 2: 病人预约 (新功能) -->
       <view class="module-patient" v-if="currentTab === 1">
-        <view class="empty-box">
-          <image src="/static/logo.png" class="empty-img" mode="aspectFit" style="opacity: 0.3;"></image>
-          <text class="empty-text">暂无今日预约病患</text>
-        </view>
+        <!-- 二级导航: 未来6个工作日 -->
+        <scroll-view scroll-x class="date-nav">
+          <view class="date-nav-item" v-for="(item, index) in workingDays" :key="index"
+                :class="{ active: selectedWorkDate === item.dateStr }"
+                @click="changeWorkDate(item.dateStr)">
+            <text class="week">{{ item.week }}</text>
+            <text class="date">{{ item.formatDate }}</text>
+          </view>
+        </scroll-view>
+
+        <!-- 预约列表 -->
+        <scroll-view scroll-y class="appointment-list">
+          <view class="appointment-card" v-for="(app, index) in appointmentList" :key="index">
+            <view class="app-left">
+              <view class="p-avatar">{{ app.patientName.substring(0,1) }}</view>
+              <view class="p-info">
+                <text class="p-name">{{ app.patientName }} <text class="p-gender" v-if="app.patientGender">({{ app.patientGender }})</text></text>
+                <text class="p-phone">{{ app.patientPhone }}</text>
+              </view>
+            </view>
+            <view class="app-right">
+              <view class="period-tag" :class="app.period === '上午' ? 'blue' : 'green'">{{ app.period }}</view>
+              <text class="book-time">预约于 {{ formatTime(app.createTime) }}</text>
+            </view>
+          </view>
+
+          <view v-if="appointmentList.length === 0" class="empty-box">
+            <image src="/static/logo.png" class="empty-img" mode="aspectFit" style="opacity: 0.2;"></image>
+            <text class="empty-text">该日暂无预约病人</text>
+          </view>
+        </scroll-view>
       </view>
 
-      <!-- 模块3: 个人中心 (增加红点) -->
+      <!-- Module 3: 个人中心 (保持不变) -->
       <view class="module-profile" v-if="currentTab === 2">
         <view class="profile-header">
           <image :src="userInfo.avatar || '/static/default_avatar.png'" class="avatar-img" mode="aspectFill"></image>
@@ -67,17 +107,14 @@
           <view class="menu-item" @click="goToPage('/pages/common/change-password')">
             <view class="menu-left"><text class="icon">🔒</text><text>修改密码</text></view><text class="arrow">></text>
           </view>
-          
-          <!-- 消息通知带红点 -->
           <view class="menu-item" @click="goToPage('/pages/doctor/messages')">
             <view class="menu-left">
-              <text class="icon">🔔</text>
-              <text>消息通知</text>
+              <text class="icon">🔔</text><text>消息通知</text>
               <view class="badge" v-if="unreadCount > 0">{{ unreadCount }}</view>
             </view>
             <text class="arrow">></text>
           </view>
-
+          <!-- 修复：picker 包裹整个 item 以便点击 -->
           <picker mode="date" :start="todayStr" @change="onDateSelected">
             <view class="menu-item">
               <view class="menu-left"><text class="icon">📅</text><text>请假申请</text></view><text class="arrow">></text>
@@ -87,22 +124,29 @@
 
         <button class="logout-btn" @click="handleLogout">退出登录</button>
       </view>
+
     </view>
 
-    <!-- 弹窗部分 (不变) -->
+    <!-- 请假弹窗 (保持不变) -->
     <view class="modal-mask" v-if="showLeaveModal">
       <view class="modal-content">
         <view class="modal-title">申请请假</view>
         <view class="modal-date">日期：{{ leaveForm.date }}</view>
         <text class="form-label">请假时段：</text>
         <view class="period-options">
-          <view v-for="p in ['上午', '下午', '全天']" :key="p" class="period-btn" :class="{ active: leaveForm.period === p }" @click="leaveForm.period = p">{{ p }}</view>
+          <view v-for="p in ['上午', '下午', '全天']" :key="p" 
+                class="period-btn" :class="{ active: leaveForm.period === p }" 
+                @click="leaveForm.period = p">{{ p }}</view>
         </view>
         <text class="form-label">请假理由：</text>
         <textarea class="modal-textarea" v-model="leaveForm.reason" placeholder="请输入请假原因..." />
-        <view class="modal-btns"><button @click="showLeaveModal = false">取消</button><button class="primary" @click="submitLeave">提交申请</button></view>
+        <view class="modal-btns">
+          <button @click="showLeaveModal = false">取消</button>
+          <button class="primary" @click="submitLeave">提交申请</button>
+        </view>
       </view>
     </view>
+
   </view>
 </template>
 
@@ -110,46 +154,115 @@
 export default {
   data() {
     return {
-      tabs: ['签到签退', '今日病患', '个人中心'],
+      tabs: ['签到签退', '病人预约', '个人中心'],
       currentTab: 0,
       userInfo: {},
-      unreadCount: 0, // 未读数
+      unreadCount: 0,
+      
+      // 考勤相关
       checkRanges: { morningIn: { label: '早上签到', start: '07:45', end: '08:15' }, morningOut: { label: '早上签退', start: '11:45', end: '12:15' }, afternoonIn: { label: '下午签到', start: '14:15', end: '14:45' }, afternoonOut: { label: '下午签退', start: '17:45', end: '18:15' } },
       currentYear: new Date().getFullYear(),
       currentMonth: new Date().getMonth() + 1,
       selectedDateStr: '', days: [], recordsMap: {}, currentRecord: {},
-      showLeaveModal: false, leaveForm: { date: '', period: '全天', reason: '' }, todayStr: ''
+      
+      // 请假相关
+      showLeaveModal: false, leaveForm: { date: '', period: '全天', reason: '' }, todayStr: '',
+
+      // 预约相关 (Module 2)
+      workingDays: [],
+      selectedWorkDate: '',
+      appointmentList: []
     };
   },
-  computed: { isToday() { return this.selectedDateStr === this.getLocalTodayStr(); } },
+  computed: {
+    isToday() {
+      return this.selectedDateStr === this.getLocalTodayStr();
+    }
+  },
   onShow() {
     const user = uni.getStorageSync('userInfo');
     if (user) {
-      this.userInfo = user;
+      this.userInfo = user; 
       this.fetchDoctorInfo();
-      this.fetchUnreadCount(); // 获取未读数
+      this.fetchUnreadCount();
       
       if (user.password === '123456') {
         uni.showModal({ title: '安全提醒', content: '您的密码为初始密码(123456)，存在安全风险，请立即修改！', showCancel: false, confirmText: '去修改', success: (res) => { if (res.confirm) { uni.navigateTo({ url: '/pages/common/change-password' }); } } });
       }
+      
       this.todayStr = this.getLocalTodayStr();
       this.initCalendar();
       this.fetchMonthRecords();
-    } else { uni.reLaunch({ url: '/pages/login/index' }); }
+      
+      // 初始化预约数据
+      this.initWorkingDays();
+      this.fetchAppointments();
+    } else {
+      uni.reLaunch({ url: '/pages/login/index' });
+    }
   },
   methods: {
-    // --- 新增：获取未读数 ---
-    fetchUnreadCount() {
-      uni.request({
-        url: 'http://localhost:8080/api/doctor/unread-count',
-        data: { doctorId: this.userInfo.id },
-        success: (res) => {
-          if(res.data.code === 200) this.unreadCount = res.data.data;
+    // --- 预约模块逻辑 ---
+    initWorkingDays() {
+      const list = [];
+      const weeks = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+      let d = new Date(); // 从今天开始
+      let count = 0;
+      
+      while (count < 6) {
+        const dayOfWeek = d.getDay();
+        // 简单逻辑：假设周六周日不工作 (如果医院周末上班需修改此处)
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const dateStr = `${year}-${month}-${day}`;
+          
+          list.push({
+            dateStr: dateStr,
+            formatDate: `${month}/${day}`,
+            week: count === 0 && dateStr === this.getLocalTodayStr() ? '今日' : weeks[dayOfWeek]
+          });
+          count++;
         }
+        d.setDate(d.getDate() + 1);
+      }
+      this.workingDays = list;
+      // 默认选中第一个(今天/最近的工作日)
+      if (!this.selectedWorkDate) this.selectedWorkDate = list[0].dateStr;
+    },
+
+    changeWorkDate(dateStr) {
+      this.selectedWorkDate = dateStr;
+      this.fetchAppointments();
+    },
+
+    fetchAppointments() {
+      if (!this.selectedWorkDate) return;
+      uni.showLoading({ title: '加载中' });
+      uni.request({
+        url: 'http://localhost:8080/api/appointment/doctor-list',
+        data: {
+          doctorId: this.userInfo.id,
+          dateStr: this.selectedWorkDate
+        },
+        success: (res) => {
+          uni.hideLoading();
+          if (res.data.code === 200) {
+            this.appointmentList = res.data.data;
+          }
+        },
+        fail: () => uni.hideLoading()
       });
     },
 
-    // --- 其他方法 (保持不变) ---
+    formatTime(t) {
+      if (!t) return '';
+      return t.split('T')[1].substring(0, 5);
+    },
+
+    // --- 其他逻辑 (保持不变) ---
+    fetchUnreadCount() { uni.request({ url: 'http://localhost:8080/api/doctor/unread-count', data: { doctorId: this.userInfo.id }, success: (res) => { if(res.data.code === 200) this.unreadCount = res.data.data; } }); },
     onDateSelected(e) { this.leaveForm.date = e.detail.value; this.leaveForm.period = '全天'; this.leaveForm.reason = ''; this.showLeaveModal = true; },
     submitLeave() { if (!this.leaveForm.reason) return uni.showToast({ title: '请输入理由', icon: 'none' }); uni.showLoading({ title: '提交中' }); uni.request({ url: 'http://localhost:8080/api/leave/apply', method: 'POST', data: { doctorId: this.userInfo.id, startDate: this.leaveForm.date, period: this.leaveForm.period, reason: this.leaveForm.reason, type: '事假' }, success: (res) => { uni.hideLoading(); if (res.data.code === 200) { this.showLeaveModal = false; uni.showToast({ title: '申请已提交' }); setTimeout(() => this.goToPage('/pages/doctor/messages'), 1000); } else { uni.showToast({ title: res.data.msg, icon: 'none' }); } } }); },
     getLocalTodayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; },
@@ -161,13 +274,13 @@ export default {
     updateDetail() { this.currentRecord = this.recordsMap[this.selectedDateStr] || {}; },
     doCheck(type) { uni.showLoading({ title: '打卡中' }); uni.request({ url: 'http://localhost:8080/api/attendance/check', method: 'POST', data: { doctorId: this.userInfo.id, type }, success: (res) => { uni.hideLoading(); if (res.data.code === 200) { uni.showToast({ title: '打卡成功' }); this.fetchMonthRecords(); } else uni.showToast({ title: res.data.msg, icon: 'none' }); } }); },
     goToPage(url) { uni.navigateTo({ url }); },
-    handleLogout() { uni.showModal({ title: '提示', content: '确定退出吗？', success: (res) => { if (res.confirm) { uni.clearStorageSync(); uni.reLaunch({ url: '/pages/login/index' }); } }}); }
+    handleLogout() { uni.showModal({ title: '提示', content: '确定要退出吗？', success: (res) => { if (res.confirm) { uni.removeStorageSync('userInfo'); uni.removeStorageSync('token'); uni.removeStorageSync('role'); uni.reLaunch({ url: '/pages/login/index' }); } } }); }
   }
 };
 </script>
 
 <style>
-/* 保持原有CSS，增加红点样式 */
+/* 保持原有样式，新增预约列表样式 */
 .container { height: 100vh; display: flex; flex-direction: column; background-color: #f5f7fa; }
 .nav-tabs { height: 90rpx; display: flex; background: #fff; box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05); z-index: 10; flex-shrink: 0; }
 .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
@@ -175,8 +288,36 @@ export default {
 .tab-item.active .tab-text { color: #2b86ff; font-weight: bold; font-size: 30rpx; }
 .tab-line { position: absolute; bottom: 10rpx; width: 40rpx; height: 6rpx; background: #2b86ff; border-radius: 3rpx; }
 .red-dot-small { width: 12rpx; height: 12rpx; background: #ff4d4f; border-radius: 50%; position: absolute; top: 20rpx; right: 40rpx; }
-
 .content-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+/* 模块2: 病人预约 (新) */
+.module-patient { flex: 1; display: flex; flex-direction: column; height: 100%; }
+.date-nav { white-space: nowrap; height: 120rpx; background: #fff; border-bottom: 1rpx solid #eee; flex-shrink: 0; }
+.date-nav-item { display: inline-flex; flex-direction: column; width: 125rpx; height: 120rpx; align-items: center; justify-content: center; position: relative; }
+.date-nav-item .week { font-size: 22rpx; color: #999; margin-bottom: 6rpx; }
+.date-nav-item .date { font-size: 28rpx; font-weight: bold; color: #333; }
+.date-nav-item.active .week, .date-nav-item.active .date { color: #2b86ff; }
+.date-nav-item.active::after { content: ''; position: absolute; bottom: 0; width: 40rpx; height: 4rpx; background: #2b86ff; border-radius: 2rpx; }
+
+.appointment-list { flex: 1; padding: 20rpx; box-sizing: border-box; }
+.appointment-card { background: #fff; border-radius: 16rpx; padding: 30rpx; margin-bottom: 20rpx; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.03); }
+.app-left { display: flex; align-items: center; }
+.p-avatar { width: 80rpx; height: 80rpx; background: #e6f1ff; color: #2b86ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 20rpx; font-size: 32rpx; }
+.p-info { display: flex; flex-direction: column; }
+.p-name { font-size: 30rpx; font-weight: bold; color: #333; margin-bottom: 6rpx; }
+.p-phone { font-size: 24rpx; color: #999; }
+.p-gender { font-size: 24rpx; color: #999; margin-left: 6rpx; font-weight: normal; }
+.app-right { display: flex; flex-direction: column; align-items: flex-end; }
+.period-tag { font-size: 22rpx; padding: 4rpx 16rpx; border-radius: 20rpx; margin-bottom: 10rpx; font-weight: bold; }
+.period-tag.blue { background: #e6f1ff; color: #2b86ff; }
+.period-tag.green { background: #f6ffed; color: #52c41a; }
+.book-time { font-size: 22rpx; color: #ccc; }
+
+.empty-box { display: flex; flex-direction: column; align-items: center; margin-top: 200rpx; }
+.empty-img { width: 160rpx; height: 160rpx; margin-bottom: 30rpx; }
+.empty-text { color: #999; font-size: 28rpx; }
+
+/* 其他模块 (考勤、个人中心) */
 .module-checkin { height: 100%; padding: 20rpx; box-sizing: border-box; }
 .calendar-card { background: #fff; border-radius: 20rpx; padding: 30rpx; margin-bottom: 20rpx; box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.03); }
 .calendar-header { display: flex; justify-content: space-between; margin-bottom: 30rpx; font-weight: bold; font-size: 32rpx; align-items: center; }
@@ -198,9 +339,6 @@ export default {
 .miss { color: #ccc; font-size: 28rpx; }
 .check-btn { font-size: 26rpx; background: #2b86ff; color: #fff; padding: 0 30rpx; height: 60rpx; line-height: 60rpx; border-radius: 30rpx; min-width: 140rpx; }
 .check-btn.orange { background: #ff9800; }
-.module-patient { height: 100%; display: flex; align-items: center; justify-content: center; }
-.empty-img { width: 200rpx; height: 200rpx; margin-bottom: 20rpx; }
-.empty-text { color: #999; font-size: 30rpx; }
 .module-profile { padding: 30rpx; background: #f5f7fa; flex: 1; }
 .profile-header { background: #fff; border-radius: 20rpx; padding: 40rpx; display: flex; align-items: center; margin-bottom: 30rpx; box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.03); }
 .avatar-img { width: 120rpx; height: 120rpx; border-radius: 50%; margin-right: 30rpx; background: #eee; }
@@ -215,7 +353,7 @@ export default {
 .badge { background: #ff4d4f; color: #fff; font-size: 20rpx; padding: 0 10rpx; border-radius: 20rpx; margin-left: 20rpx; }
 .logout-btn { margin-top: 60rpx; background: #fff; color: #ff4d4f; border-radius: 45rpx; height: 90rpx; line-height: 90rpx; font-size: 32rpx; box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.05); }
 .modal-mask { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.6); z-index: 999; display: flex; align-items: center; justify-content: center; }
-.modal-content { width: 600rpx; background-color: #fff; border-radius: 16rpx; padding: 40rpx; }
+.modal-content { width: 600rpx; background-color: #fff; border-radius: 24rpx; padding: 40rpx; }
 .modal-title { font-size: 32rpx; font-weight: bold; text-align: center; margin-bottom: 30rpx; }
 .modal-date { text-align: center; color: #2b86ff; margin-bottom: 20rpx; font-weight: bold; }
 .form-label { font-size: 28rpx; color: #333; margin: 20rpx 0 10rpx; display: block; }
