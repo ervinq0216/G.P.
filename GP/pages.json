@@ -71,6 +71,20 @@
 				"navigationBarTitleText": "修改密码",
 				"navigationStyle": "custom"
 			}
+		},
+		{
+			"path": "pages/patient/my-appointments",
+			"style": {
+				"navigationBarTitleText": "我的挂号单",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/doctor/patient-detail",
+			"style": {
+				"navigationBarTitleText": "病人诊疗",
+				"enablePullDownRefresh": false
+			}
 		}
 	],
 	"globalStyle": {

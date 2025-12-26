@@ -55,40 +55,33 @@
         <view style="height: 40rpx;"></view>
       </scroll-view>
 
-      <!-- Module 2: 病人预约 (新功能) -->
-      <view class="module-patient" v-if="currentTab === 1">
-        <!-- 二级导航: 未来6个工作日 -->
-        <scroll-view scroll-x class="date-nav">
-          <view class="date-nav-item" v-for="(item, index) in workingDays" :key="index"
-                :class="{ active: selectedWorkDate === item.dateStr }"
-                @click="changeWorkDate(item.dateStr)">
-            <text class="week">{{ item.week }}</text>
-            <text class="date">{{ item.formatDate }}</text>
-          </view>
-        </scroll-view>
-
-        <!-- 预约列表 -->
-        <scroll-view scroll-y class="appointment-list">
-          <view class="appointment-card" v-for="(app, index) in appointmentList" :key="index">
-            <view class="app-left">
-              <view class="p-avatar">{{ app.patientName.substring(0,1) }}</view>
-              <view class="p-info">
-                <text class="p-name">{{ app.patientName }} <text class="p-gender" v-if="app.patientGender">({{ app.patientGender }})</text></text>
-                <text class="p-phone">{{ app.patientPhone }}</text>
-              </view>
-            </view>
-            <view class="app-right">
-              <view class="period-tag" :class="app.period === '上午' ? 'blue' : 'green'">{{ app.period }}</view>
-              <text class="book-time">预约于 {{ formatTime(app.createTime) }}</text>
-            </view>
-          </view>
-
-          <view v-if="appointmentList.length === 0" class="empty-box">
-            <image src="/static/logo.png" class="empty-img" mode="aspectFit" style="opacity: 0.2;"></image>
-            <text class="empty-text">该日暂无预约病人</text>
-          </view>
-        </scroll-view>
-      </view>
+      <!-- Module 2: 病人预约 -->
+      	<view class="module-patient" v-if="currentTab === 1">
+      		<scroll-view scroll-x class="date-nav">
+      			<view class="date-nav-item" v-for="(item, index) in workingDays" :key="index"
+      				:class="{ active: selectedWorkDate === item.dateStr }" @click="changeWorkDate(item.dateStr)">
+      				<text class="week">{{ item.week }}</text>
+      				<text class="date">{{ item.formatDate }}</text>
+      			</view>
+      		</scroll-view>
+      		<scroll-view scroll-y class="appointment-list">
+      			<!-- 核心修复：确保 @click 绑定了 goToPatientDetail -->
+      			<view class="appointment-card" v-for="(app, index) in appointmentList" :key="index" @click="goToPatientDetail(app)">
+      				<view class="app-left">
+      					<view class="p-avatar">{{ app.patientName ? app.patientName.substring(0,1) : '患' }}</view>
+      					<view class="p-info">
+      						<text class="p-name">{{ app.patientName }} <text class="p-gender">({{ app.patientGender }})</text></text>
+      						<text class="p-phone">{{ app.patientPhone }}</text>
+      					</view>
+      				</view>
+      				<view class="app-right">
+      					<view class="period-tag" :class="app.period === '上午' ? 'blue' : 'green'">{{ app.period }}</view>
+      					<text class="book-time">预约于 {{ formatTime(app.bookTime) }}</text>
+      				</view>
+      			</view>
+      			<view v-if="appointmentList.length === 0" class="empty-box">暂无预约</view>
+      		</scroll-view>
+      	</view>
 
       <!-- Module 3: 个人中心 (保持不变) -->
       <view class="module-profile" v-if="currentTab === 2">
@@ -250,6 +243,18 @@ export default {
       this.selectedWorkDate = dateStr;
       this.fetchAppointments();
     },
+	
+	// --- 新增跳转逻辑 ---
+	goToPatientDetail(app) {
+				console.log('点击跳转', app); // 调试日志
+				uni.navigateTo({
+					url: `/pages/doctor/patient-detail?appointmentId=${app.id}&patientId=${app.patientId}`,
+					fail: (err) => {
+						console.error('跳转失败', err);
+						uni.showToast({ title: '页面不存在', icon: 'none' });
+					}
+				});
+			},
 
     fetchAppointments() {
       if (!this.selectedWorkDate) return;
