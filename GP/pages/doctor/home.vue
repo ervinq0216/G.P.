@@ -92,38 +92,37 @@
 
       <!-- Module 3: 个人中心 (保持不变) -->
       <view class="module-profile" v-if="currentTab === 2">
-        <view class="profile-header">
-          <image :src="userInfo.avatar || '/static/default_avatar.png'" class="avatar-img" mode="aspectFill"></image>
-          <view class="user-info">
-            <text class="name">{{ userInfo.realName || '医生' }}</text>
-            <text class="job-num">工号：{{ userInfo.jobNumber }}</text>
-          </view>
-        </view>
-
-        <view class="menu-list">
-          <view class="menu-item" @click="goToPage('/pages/doctor/info')">
-            <view class="menu-left"><text class="icon">👤</text><text>编辑个人信息</text></view><text class="arrow">></text>
-          </view>
-          <view class="menu-item" @click="goToPage('/pages/common/change-password')">
-            <view class="menu-left"><text class="icon">🔒</text><text>修改密码</text></view><text class="arrow">></text>
-          </view>
-          <view class="menu-item" @click="goToPage('/pages/doctor/messages')">
-            <view class="menu-left">
-              <text class="icon">🔔</text><text>消息通知</text>
-              <view class="badge" v-if="unreadCount > 0">{{ unreadCount }}</view>
-            </view>
-            <text class="arrow">></text>
-          </view>
-          <!-- 修复：picker 包裹整个 item 以便点击 -->
-          <picker mode="date" :start="todayStr" @change="onDateSelected">
-            <view class="menu-item">
-              <view class="menu-left"><text class="icon">📅</text><text>请假申请</text></view><text class="arrow">></text>
-            </view>
-          </picker>
-        </view>
-
-        <button class="logout-btn" @click="handleLogout">退出登录</button>
-      </view>
+      				<view class="profile-header">
+      					<image :src="userInfo.avatar || '/static/default_avatar.png'" class="avatar-img" mode="aspectFill"></image>
+      					<view class="user-info">
+      						<text class="name">{{ userInfo.realName || '医生' }}</text>
+      						<text class="job-num">工号：{{ userInfo.jobNumber }}</text>
+      					</view>
+      				</view>
+      
+      				<view class="menu-list">
+      					<view class="menu-item" @click="goToPage('/pages/doctor/info')">
+      						<view class="menu-left"><text class="icon">👤</text><text>编辑个人信息</text></view><text class="arrow">></text>
+      					</view>
+      					<view class="menu-item" @click="goToPage('/pages/common/change-password')">
+      						<view class="menu-left"><text class="icon">🔒</text><text>修改密码</text></view><text class="arrow">></text>
+      					</view>
+      					<view class="menu-item" @click="goToPage('/pages/doctor/messages')">
+      						<view class="menu-left">
+      							<text class="icon">🔔</text><text>消息通知</text>
+      							<view class="badge" v-if="unreadCount > 0">{{ unreadCount }}</view>
+      						</view>
+      						<text class="arrow">></text>
+      					</view>
+      					<picker mode="date" @change="onDateSelected">
+      						<view class="menu-item">
+      							<view class="menu-left"><text class="icon">📅</text><text>请假申请</text></view><text class="arrow">></text>
+      						</view>
+      					</picker>
+      				</view>
+      
+      				<button class="logout-btn" @click="handleLogout">退出登录</button>
+      			</view>
 
     </view>
 

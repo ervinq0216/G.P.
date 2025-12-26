@@ -106,30 +106,40 @@
 			</view>
 
 			<!-- Module D: 个人中心 -->
-			<view class="module-profile" v-if="currentTab === 3">
-				<view class="profile-header">
-					<view class="profile-bg-circle"></view>
-					<view class="user-info-box" @click="goToInfo">
-						<image :src="userInfo.avatar || '/static/default_avatar.png'" class="user-avatar-img" mode="aspectFill"></image>
-						<view class="user-text">
-							<text class="user-name">{{ userInfo.realName || '未填写姓名' }}</text>
-							<text class="user-phone">{{ userInfo.phone || '账号未绑定' }}</text>
+			<!-- Module D: 个人中心 (核心修复点) -->
+						<view class="module-profile" v-if="currentTab === 3">
+							<view class="profile-header">
+								<view class="profile-bg-circle"></view>
+								<view class="user-info-box" @click="goToInfo">
+									<image :src="userInfo.avatar || '/static/default_avatar.png'" class="user-avatar-img" mode="aspectFill"></image>
+									<view class="user-text">
+										<text class="user-name">{{ userInfo.realName || '未填写姓名' }}</text>
+										<text class="user-phone">{{ userInfo.phone || '账号未绑定' }}</text>
+									</view>
+									<text class="edit-hint">编辑 ></text>
+								</view>
+							</view>
+							
+							<view class="menu-list">
+								<view class="menu-item" @click="goToInfo">
+									<view class="menu-left"><text class="menu-icon">👤</text><text class="menu-title">个人信息</text></view>
+									<text class="menu-arrow">></text>
+								</view>
+								
+								<!-- 补全修改密码按钮 -->
+								<view class="menu-item" @click="goToPage('/pages/common/change-password')">
+									<view class="menu-left"><text class="menu-icon">🔒</text><text class="menu-title">修改密码</text></view>
+									<text class="menu-arrow">></text>
+								</view>
+			
+								<view class="menu-item" @click="showToast('功能开发中')">
+									<view class="menu-left"><text class="menu-icon">📋</text><text class="menu-title">我的挂号单</text></view>
+									<text class="menu-arrow">></text>
+								</view>
+							</view>
+							
+							<button class="logout-btn-large" @click="handleLogout">退出登录</button>
 						</view>
-						<text class="edit-hint">编辑 ></text>
-					</view>
-				</view>
-				<view class="menu-list">
-					<view class="menu-item" @click="goToInfo">
-						<view class="menu-left"><text class="menu-icon">👤</text><text class="menu-title">个人信息</text></view>
-						<text class="menu-arrow">></text>
-					</view>
-					<view class="menu-item" @click="showToast('挂号功能开发中')">
-						<view class="menu-left"><text class="menu-icon">📋</text><text class="menu-title">我的挂号单</text></view>
-						<text class="menu-arrow">></text>
-					</view>
-				</view>
-				<button class="logout-btn-large" @click="handleLogout">退出登录</button>
-			</view>
 		</view>
 
 		<!-- 弹窗：科室详情 & 医生列表 -->

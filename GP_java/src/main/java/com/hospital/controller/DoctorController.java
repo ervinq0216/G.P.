@@ -18,6 +18,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * 医生端控制器 - 严格限定医生业务
+ */
 @RestController
 @RequestMapping("/api/doctor")
 @CrossOrigin(origins = "*")
@@ -30,122 +33,67 @@ public class DoctorController {
     @Autowired
     private LeaveMapper leaveMapper;
 
+    /**
+     * 获取医生信息 - 强制只查询医生表
+     */
     @GetMapping("/info/{id}")
     public Result<Doctor> getInfo(@PathVariable Long id) {
-        Doctor doctor = doctorMapper.selectById(id);
-        if (doctor != null) {
-            return Result.success(doctor);
+        Doctor d = doctorMapper.selectById(id);
+        if (d != null) {
+            d.setPassword(null); // 脱敏
+            return Result.success(d);
         }
-        return Result.error("医生不存在");
+        return Result.error("未找到该医生资料");
     }
 
+    /**
+     * 更新医生个人资料
+     */
     @PostMapping("/update")
     public Result<Doctor> updateInfo(@RequestBody Doctor doctor) {
         if (doctor.getId() == null) return Result.error("ID不能为空");
         doctorMapper.updateById(doctor);
-        Doctor newInfo = doctorMapper.selectById(doctor.getId());
-        return Result.success(newInfo);
+        Doctor updated = doctorMapper.selectById(doctor.getId());
+        if (updated != null) updated.setPassword(null);
+        return Result.success(updated);
     }
 
-    /**
-     * 获取未读消息数量 (用于显示红点)
-     * 逻辑：(相关通知时间 > 上次阅读时间) + (请假审批更新时间 > 上次阅读时间)
-     */
     @GetMapping("/unread-count")
     public Result<Integer> getUnreadCount(@RequestParam Long doctorId) {
-        Doctor doctor = doctorMapper.selectById(doctorId);
-        if (doctor == null) return Result.success(0);
-
-        LocalDateTime lastRead = doctor.getLastReadTime();
-        if (lastRead == null) lastRead = LocalDateTime.of(2000, 1, 1, 0, 0);
-
-        // 1. 统计未读通知
-        // 目标包括: all(所有人), doctor(所有医生), dept(本可以室)
-        Long noticeCount = noticeMapper.selectCount(new LambdaQueryWrapper<Notice>()
-                .eq(Notice::getType, "notice")
-                .gt(Notice::getCreatedTime, lastRead)
-                .and(w -> w.eq(Notice::getTargetType, "all")
-                        .or().eq(Notice::getTargetType, "doctor") // 新增：全部医生
-                        .or(sub -> sub.eq(Notice::getTargetType, "dept").eq(Notice::getTargetDeptId, doctor.getDeptId()))
-                ));
-
-        // 2. 统计未读请假反馈 (状态变更)
-        Long leaveCount = leaveMapper.selectCount(new LambdaQueryWrapper<Leave>()
-                .eq(Leave::getDoctorId, doctorId)
-                .gt(Leave::getUpdateTime, lastRead));
-
+        Doctor d = doctorMapper.selectById(doctorId);
+        if (d == null) return Result.success(0);
+        LocalDateTime lastRead = d.getLastReadTime() == null ? LocalDateTime.of(2000,1,1,0,0) : d.getLastReadTime();
+        Long noticeCount = noticeMapper.selectCount(new LambdaQueryWrapper<Notice>().eq(Notice::getType, "notice").gt(Notice::getCreatedTime, lastRead).and(w -> w.eq(Notice::getTargetType, "all").or().eq(Notice::getTargetType, "doctor").or(sub -> sub.eq(Notice::getTargetType, "dept").eq(Notice::getTargetDeptId, d.getDeptId()))));
+        Long leaveCount = leaveMapper.selectCount(new LambdaQueryWrapper<Leave>().eq(Leave::getDoctorId, doctorId).gt(Leave::getUpdateTime, lastRead));
         return Result.success((int)(noticeCount + leaveCount));
     }
 
-    /**
-     * 获取所有消息列表 (通知 + 请假反馈)
-     */
     @GetMapping("/messages")
     public Result<List<Map<String, Object>>> getMessages(@RequestParam Long doctorId) {
-        Doctor doctor = doctorMapper.selectById(doctorId);
-        if (doctor == null) return Result.error("医生不存在");
-
-        List<Map<String, Object>> resultList = new ArrayList<>();
-
-        // 1. 获取相关通知
-        List<Notice> notices = noticeMapper.selectList(new LambdaQueryWrapper<Notice>()
-                .eq(Notice::getType, "notice")
-                .and(w -> w.eq(Notice::getTargetType, "all")
-                        .or().eq(Notice::getTargetType, "doctor") // 新增：全部医生
-                        .or(sub -> sub.eq(Notice::getTargetType, "dept").eq(Notice::getTargetDeptId, doctor.getDeptId()))
-                )
-                .orderByDesc(Notice::getCreatedTime)
-                .last("LIMIT 20"));
-
+        Doctor d = doctorMapper.selectById(doctorId);
+        if (d == null) return Result.error("医生不存在");
+        List<Map<String, Object>> resList = new ArrayList<>();
+        List<Notice> notices = noticeMapper.selectList(new LambdaQueryWrapper<Notice>().eq(Notice::getType, "notice").and(w -> w.eq(Notice::getTargetType, "all").or().eq(Notice::getTargetType, "doctor").or(sub -> sub.eq(Notice::getTargetType, "dept").eq(Notice::getTargetDeptId, d.getDeptId()))).orderByDesc(Notice::getCreatedTime).last("LIMIT 20"));
         for (Notice n : notices) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", "N" + n.getId());
-            map.put("type", "notice");
-            map.put("title", "系统通知：" + n.getTitle());
-            map.put("content", n.getContent());
-            map.put("time", n.getCreatedTime());
-            resultList.add(map);
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", "N" + n.getId()); m.put("type", "notice"); m.put("title", "系统通知：" + n.getTitle()); m.put("content", n.getContent()); m.put("time", n.getCreatedTime());
+            resList.add(m);
         }
-
-        // 2. 获取请假记录
-        List<Leave> leaves = leaveMapper.selectList(new LambdaQueryWrapper<Leave>()
-                .eq(Leave::getDoctorId, doctorId)
-                .orderByDesc(Leave::getUpdateTime)
-                .last("LIMIT 20"));
-
+        List<Leave> leaves = leaveMapper.selectList(new LambdaQueryWrapper<Leave>().eq(Leave::getDoctorId, doctorId).orderByDesc(Leave::getUpdateTime).last("LIMIT 20"));
         for (Leave l : leaves) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", "L" + l.getId());
-            map.put("type", "leave");
-            String statusText = "待审批";
-            if ("approved".equals(l.getStatus())) statusText = "已通过";
-            if ("rejected".equals(l.getStatus())) statusText = "已拒绝";
-
-            map.put("title", "请假申请反馈");
-            map.put("content", String.format("您申请的 %s (%s) 请假状态更新为：%s", l.getStartDate(), l.getPeriod(), statusText));
-            map.put("time", l.getUpdateTime() != null ? l.getUpdateTime() : l.getCreatedTime());
-            map.put("status", l.getStatus());
-            resultList.add(map);
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", "L" + l.getId()); m.put("type", "leave"); m.put("title", "请假申请反馈"); m.put("content", String.format("您申请的 %s 请假状态更新为：%s", l.getStartDate(), l.getStatus())); m.put("time", l.getUpdateTime() != null ? l.getUpdateTime() : l.getCreatedTime()); m.put("status", l.getStatus());
+            resList.add(m);
         }
-
-        // 3. 混合排序 (按时间倒序)
-        List<Map<String, Object>> sortedList = resultList.stream()
-                .sorted((m1, m2) -> ((LocalDateTime) m2.get("time")).compareTo((LocalDateTime) m1.get("time")))
-                .collect(Collectors.toList());
-
-        return Result.success(sortedList);
+        return Result.success(resList.stream().sorted((m1, m2) -> ((LocalDateTime) m2.get("time")).compareTo((LocalDateTime) m1.get("time"))).collect(Collectors.toList()));
     }
 
-    /**
-     * 标记消息已读
-     */
     @PostMapping("/read")
     public Result<String> markRead(@RequestBody Map<String, Long> params) {
-        Long doctorId = params.get("doctorId");
-        Doctor doctor = new Doctor();
-        doctor.setId(doctorId);
-        doctor.setLastReadTime(LocalDateTime.now());
-        doctorMapper.updateById(doctor);
-        return Result.success("已读");
+        Doctor doc = new Doctor();
+        doc.setId(params.get("doctorId"));
+        doc.setLastReadTime(LocalDateTime.now());
+        doctorMapper.updateById(doc);
+        return Result.success("ok");
     }
 }
