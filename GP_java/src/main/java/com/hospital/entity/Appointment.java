@@ -17,14 +17,24 @@ public class Appointment {
     private Long scheduleId;
 
     /**
-     * 状态: booked(已预约), completed(已就诊), cancelled(已取消)
+     * 状态: booked(已预约), completed(已就诊/已完成), cancelled(已取消)
      */
     private String status;
 
     /**
-     * 病例/诊断信息
+     * 医生填写的病例信息
      */
     private String medicalRecord;
+
+    /**
+     * 患者评价内容
+     */
+    private String comment;
+
+    /**
+     * 评分 (1-5)
+     */
+    private Integer rating;
 
     private LocalDateTime createdTime;
 }

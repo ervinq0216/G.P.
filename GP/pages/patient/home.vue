@@ -112,46 +112,38 @@
 				</view>
 			</view>
 
-			<!-- Module D: 个人中心 -->
-			<view class="module-profile" v-if="currentTab === 3">
-				<view class="profile-header">
-					<view class="profile-bg-circle"></view>
-					<view class="user-info-box" @click="goToInfo">
-						<image :src="userInfo.avatar || '/static/default_avatar.png'" class="user-avatar-img" mode="aspectFill"></image>
-						<view class="user-text">
-							<text class="user-name">{{ userInfo.realName || '未填写姓名' }}</text>
-							<text class="user-phone">{{ userInfo.phone || '账号未绑定' }}</text>
-						</view>
-						<text class="edit-hint">编辑 ></text>
-					</view>
-				</view>
-				
-				<view class="menu-list">
-					<view class="menu-item" @click="goToInfo">
-						<view class="menu-left"><text class="menu-icon">👤</text><text class="menu-title">个人信息</text></view>
-						<text class="menu-arrow">></text>
-					</view>
-					
-					<view class="menu-item" @click="goToPage('/pages/common/change-password')">
-						<view class="menu-left"><text class="menu-icon">🔒</text><text class="menu-title">修改密码</text></view>
-						<text class="menu-arrow">></text>
-					</view>
-
-					<!-- 更新：跳转到我的挂号单 -->
-					<view class="menu-item" @click="goToPage('/pages/patient/my-appointments')">
-						<view class="menu-left"><text class="menu-icon">📋</text><text class="menu-title">我的挂号单</text></view>
-						<text class="menu-arrow">></text>
-					</view>
-					
-					<view class="menu-item" @click="showToast('功能开发中')">
-						<view class="menu-left"><text class="menu-icon">⭐</text><text class="menu-title">我的收藏</text></view>
-						<text class="menu-arrow">></text>
-					</view>
-				</view>
-				
-				<button class="logout-btn-large" @click="handleLogout">退出登录</button>
-			</view>
-		</view>
+      <!-- Module D: 个人中心 -->
+      <view class="module-profile" v-if="currentTab === 3">
+        <view class="profile-header">
+          <view class="profile-bg-circle"></view>
+          <view class="user-info-box" @click="goToInfo">
+            <image :src="userInfo.avatar || '/static/default_avatar.png'" class="user-avatar-img" mode="aspectFill"></image>
+            <view class="user-text">
+              <text class="user-name">{{ userInfo.realName || '未填写姓名' }}</text>
+              <text class="user-phone">{{ userInfo.phone || '账号未绑定' }}</text>
+            </view>
+            <text class="edit-hint">编辑 ></text>
+          </view>
+        </view>
+        <view class="menu-list">
+          <view class="menu-item" @click="goToInfo">
+            <view class="menu-left"><text class="menu-icon">👤</text><text class="menu-title">个人信息</text></view><text class="menu-arrow">></text>
+          </view>
+          <view class="menu-item" @click="goToPage('/pages/common/change-password')">
+            <view class="menu-left"><text class="menu-icon">🔒</text><text class="menu-title">修改密码</text></view><text class="menu-arrow">></text>
+          </view>
+          <view class="menu-item" @click="goToPage('/pages/patient/my-appointments')">
+            <view class="menu-left"><text class="menu-icon">📋</text><text class="menu-title">我的挂号单</text></view><text class="menu-arrow">></text>
+          </view>
+          
+          <!-- 更新：我的收藏 -->
+          <view class="menu-item" @click="openFavorites">
+            <view class="menu-left"><text class="menu-icon">⭐</text><text class="menu-title">我的收藏</text></view><text class="menu-arrow">></text>
+          </view>
+        </view>
+        <button class="logout-btn-large" @click="handleLogout">退出登录</button>
+      </view>
+    </view>
 		
 		<!-- 弹窗：科室详情 & 医生列表 -->
 		<view class="modal-mask" v-if="showDeptModal" @click="showDeptModal = false">
@@ -190,6 +182,27 @@
 				<button class="modal-btn" @click="confirmAI">确认并继续</button>
 			</view>
 		</view>
+		
+		    <!-- 新增：我的收藏弹窗 -->
+		    <view class="modal-mask" v-if="showFavModal" @click="showFavModal = false">
+		      <view class="modal-content fav-modal" @click.stop>
+		        <view class="modal-header">
+		          <text class="modal-title">我的收藏医生</text>
+		          <text class="close-btn" @click="showFavModal = false">×</text>
+		        </view>
+		        <scroll-view scroll-y class="fav-scroll">
+		          <view class="doctor-item" v-for="doc in favDoctors" :key="doc.doctorId" @click="goToDoctorDetail(doc.doctorId)">
+		            <image :src="doc.avatar || '/static/default_avatar.png'" class="doc-avatar" mode="aspectFill"></image>
+		            <view class="doc-right">
+		              <text class="doc-name">{{ doc.realName }}</text>
+		              <text class="doc-dept">{{ doc.deptName }} | 工号:{{ doc.jobNumber }}</text>
+		            </view>
+		            <text class="arrow">></text>
+		          </view>
+		          <view v-if="favDoctors.length === 0" class="empty-doc">暂无收藏</view>
+		        </scroll-view>
+		      </view>
+		    </view>
 
 	</view>
 </template>
@@ -214,7 +227,10 @@ export default {
 			inputMessage: '',
 			chatList: [],
 			isAiLoading: false,
-			scrollTop: 0
+			scrollTop: 0,
+			// 收藏相关
+			showFavModal: false,
+			favDoctors: []
 		};
 	},
 	computed: {
@@ -267,6 +283,22 @@ export default {
 					}
 				}
 			});
+		},
+		
+		openFavorites() {
+		    this.showFavModal = true;
+		    uni.showLoading({ title: '加载中' });
+		    uni.request({
+		    url: 'http://localhost:8080/api/favorite/list',
+		    data: { patientId: this.userInfo.id },
+		    success: (res) => {
+		        uni.hideLoading();
+		        if (res.data.code === 200) {
+		        this.favDoctors = res.data.data;
+		        }
+		    },
+		    fail: () => uni.hideLoading()
+		    });
 		},
 		fetchDepts() { uni.request({ url: 'http://localhost:8080/api/patient/dept/list', success: r => this.allDepts = r.data.data }); },
 		openDeptModal(dept) { this.selectedDept = dept; this.deptDoctors = []; this.showDeptModal = true; uni.showLoading({ title: '加载中' }); uni.request({ url: 'http://localhost:8080/api/patient/doctor/list', data: { deptId: dept.id }, success: (res) => { uni.hideLoading(); if (res.data.code === 200) this.deptDoctors = res.data.data; }, fail: () => uni.hideLoading() }); },
@@ -376,4 +408,8 @@ export default {
 .modal-body { margin-top: 30rpx; font-size: 28rpx; color: #666; line-height: 1.6; }
 .highlight { color: #ff4d4f; font-weight: bold; display: block; margin-top: 20rpx; }
 .modal-btn { margin-top: 40rpx; background: #2b86ff; color: #fff; border-radius: 50rpx; }
+/* 收藏弹窗样式 */
+.fav-modal { width: 660rpx; max-height: 80vh; display: flex; flex-direction: column; }
+.fav-scroll { flex: 1; height: 600rpx; }
+.contact-row { display: flex; align-items: center; padding: 20rpx 0; }
 </style>

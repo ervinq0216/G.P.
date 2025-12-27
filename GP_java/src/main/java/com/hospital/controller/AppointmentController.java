@@ -33,7 +33,7 @@ public class AppointmentController {
     private DepartmentMapper departmentMapper;
 
     /**
-     * 预约挂号 (患者提交)
+     * 预约挂号
      */
     @PostMapping("/book")
     @Transactional
@@ -64,7 +64,7 @@ public class AppointmentController {
     }
 
     /**
-     * 医生查看某天的预约列表
+     * 医生查看预约列表
      */
     @GetMapping("/doctor-list")
     public Result<List<Map<String, Object>>> getDoctorAppointments(@RequestParam Long doctorId, @RequestParam String dateStr) {
@@ -74,7 +74,6 @@ public class AppointmentController {
                     .eq(Schedule::getDoctorId, doctorId).eq(Schedule::getWorkDate, date));
 
             if (schedules.isEmpty()) return Result.success(new ArrayList<>());
-
             List<Long> scheduleIds = schedules.stream().map(Schedule::getId).toList();
             List<Appointment> apps = appointmentMapper.selectList(new LambdaQueryWrapper<Appointment>()
                     .in(Appointment::getScheduleId, scheduleIds).eq(Appointment::getStatus, "booked").orderByAsc(Appointment::getCreatedTime));
@@ -86,7 +85,7 @@ public class AppointmentController {
                 Schedule s = schedules.stream().filter(item -> item.getId().equals(a.getScheduleId())).findFirst().orElse(null);
 
                 map.put("id", a.getId());
-                map.put("patientId", a.getPatientId()); // 关键：新增patientId供跳转使用
+                map.put("patientId", a.getPatientId());
                 map.put("patientName", p != null ? p.getRealName() : "未知");
                 map.put("patientPhone", p != null ? p.getPhone() : "-");
                 map.put("patientGender", p != null ? p.getGender() : "");
@@ -101,7 +100,7 @@ public class AppointmentController {
     }
 
     /**
-     * 患者查看自己的挂号单
+     * 患者查看挂号单
      */
     @GetMapping("/patient-list")
     public Result<List<Map<String, Object>>> getPatientAppointments(@RequestParam Long patientId) {
@@ -113,8 +112,11 @@ public class AppointmentController {
             Map<String, Object> map = new HashMap<>();
             map.put("id", a.getId());
             map.put("status", a.getStatus());
-            map.put("medicalRecord", a.getMedicalRecord()); // 返回病例信息
+            map.put("medicalRecord", a.getMedicalRecord());
+            map.put("comment", a.getComment());
+            map.put("rating", a.getRating());
             map.put("createTime", a.getCreatedTime());
+
             Schedule s = scheduleMapper.selectById(a.getScheduleId());
             if (s != null) {
                 map.put("workDate", s.getWorkDate());
@@ -133,14 +135,13 @@ public class AppointmentController {
     }
 
     /**
-     * 获取患者的历史病例 (不包含当前未完成的预约)
+     * 获取患者历史病例
      */
     @GetMapping("/history")
     public Result<List<Map<String, Object>>> getPatientHistory(@RequestParam Long patientId) {
-        // 查询该患者所有已完成(completed)的预约
         List<Appointment> apps = appointmentMapper.selectList(new LambdaQueryWrapper<Appointment>()
                 .eq(Appointment::getPatientId, patientId)
-                .isNotNull(Appointment::getMedicalRecord) // 必须有病例
+                .isNotNull(Appointment::getMedicalRecord)
                 .orderByDesc(Appointment::getCreatedTime));
 
         List<Map<String, Object>> result = new ArrayList<>();
@@ -162,21 +163,83 @@ public class AppointmentController {
     }
 
     /**
-     * 医生提交病例 (诊断)
+     * 医生提交病例
      */
     @PostMapping("/diagnose")
     public Result<String> submitDiagnosis(@RequestBody Appointment app) {
-        if (app.getId() == null || app.getMedicalRecord() == null) {
-            return Result.error("信息不完整");
-        }
+        if (app.getId() == null || app.getMedicalRecord() == null) return Result.error("信息不完整");
 
         Appointment existing = appointmentMapper.selectById(app.getId());
         if (existing == null) return Result.error("预约不存在");
 
         existing.setMedicalRecord(app.getMedicalRecord());
-        existing.setStatus("completed"); // 标记为已完成/已就诊
+        existing.setStatus("completed");
         appointmentMapper.updateById(existing);
 
         return Result.success("病例提交成功");
+    }
+
+    /**
+     * 患者提交评价
+     */
+    @PostMapping("/comment")
+    public Result<String> submitComment(@RequestBody Appointment app) {
+        if (app.getId() == null) return Result.error("ID为空");
+
+        Appointment existing = appointmentMapper.selectById(app.getId());
+        if (existing == null) return Result.error("记录不存在");
+
+        if (!"completed".equals(existing.getStatus())) {
+            return Result.error("就诊完成后才能评价");
+        }
+
+        existing.setComment(app.getComment());
+        if (app.getRating() != null) {
+            existing.setRating(app.getRating());
+        }
+        appointmentMapper.updateById(existing);
+
+        return Result.success("评价成功");
+    }
+
+    /**
+     * 获取医生评价列表 (新增接口)
+     */
+    @GetMapping("/reviews")
+    public Result<List<Map<String, Object>>> getDoctorReviews(@RequestParam Long doctorId) {
+        List<Appointment> apps = appointmentMapper.selectList(new LambdaQueryWrapper<Appointment>()
+                .eq(Appointment::getDoctorId, doctorId)
+                .isNotNull(Appointment::getComment)
+                .ne(Appointment::getComment, "") // 必须有评论内容
+                .orderByDesc(Appointment::getCreatedTime));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Appointment a : apps) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", a.getId());
+            map.put("comment", a.getComment());
+            map.put("rating", a.getRating() == null ? 0 : a.getRating());
+            map.put("time", a.getCreatedTime());
+
+            // 获取并脱敏患者姓名
+            Patient p = patientMapper.selectById(a.getPatientId());
+            String name = "匿名用户";
+            if (p != null && p.getRealName() != null && !p.getRealName().isEmpty()) {
+                String realName = p.getRealName();
+                if (realName.length() >= 2) {
+                    StringBuilder sb = new StringBuilder(realName);
+                    // 替换第二个字为 *
+                    sb.setCharAt(1, '*');
+                    name = sb.toString();
+                } else {
+                    name = realName; // 一个字的名字不处理
+                }
+            }
+            map.put("patientName", name);
+            // 头像统一使用默认，不查数据库头像字段
+
+            result.add(map);
+        }
+        return Result.success(result);
     }
 }
